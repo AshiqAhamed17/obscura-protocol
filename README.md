@@ -105,6 +105,7 @@ Trader ──(private deposit note)──▶ Market/Escrow Contract (Solidity)
 contracts/      Foundry — market/escrow contract + tests (M0 ✅)
 aggregation/    Plain Rust crate — batch settlement logic, unit tested (M0 ✅)
 guest/          SP1 guest program (placeholder until M2)
+circuits/       Noir — shielded-note ZK primitives (M1, in progress)
 ```
 
 ## Running locally
@@ -115,6 +116,9 @@ cd contracts && forge test -vv
 
 # Rust workspace — batch settlement logic (6 tests)
 cargo test
+
+# Noir circuits — in-circuit unit tests (see circuits/README.md for toolchain)
+cd circuits && nargo test
 ```
 
 ## Prior work this builds on
