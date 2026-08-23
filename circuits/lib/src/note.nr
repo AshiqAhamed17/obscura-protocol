@@ -36,6 +36,19 @@ impl Note {
         ])
     }
 
+    /// Nullifier revealed at claim time to prevent double-claims.
+    ///
+    /// Derived from `nullifier_secret` and `market_id` only — NOT from the
+    /// blinding `secret`, `side`, or `amount`. This is what makes a claim
+    /// unlinkable to its deposit: an observer sees the note's commitment
+    /// (a `hash_5` over all five fields) when it is deposited and its
+    /// nullifier (this `hash_2`) when it is claimed, but cannot connect the
+    /// two without knowing `nullifier_secret`. Only the holder can compute
+    /// both. Binding `market_id` keeps nullifiers distinct across markets.
+    pub fn nullifier(self) -> Field {
+        poseidon::poseidon::bn254::hash_2([self.nullifier_secret, self.market_id])
+    }
+
     /// A well-formed note has a boolean side (0 or 1). Consumers should call
     /// this wherever a note is used to reject malformed sides.
     pub fn assert_valid(self) {
@@ -96,4 +109,45 @@ fn accepts_boolean_sides() {
 #[test(should_fail_with = "note side must be 0 or 1")]
 fn rejects_non_boolean_side() {
     Note { market_id: 1, side: 2, amount: 1, secret: 1, nullifier_secret: 1 }.assert_valid();
+}
+
+// --- nullifier -------------------------------------------------------------
+
+#[test]
+fn nullifier_is_deterministic() {
+    let note = Note { market_id: 1, side: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    assert(note.nullifier() == note.nullifier());
+}
+
+#[test]
+fn nullifier_binds_nullifier_secret() {
+    // Two deposits differing only in nullifier_secret must yield different
+    // nullifiers — this is what prevents one note's claim from spending
+    // another's slot in the on-chain nullifier registry.
+    let a = Note { market_id: 1, side: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    let b = Note { market_id: 1, side: 1, amount: 100, secret: 42, nullifier_secret: 8 };
+    assert(a.nullifier() != b.nullifier());
+}
+
+#[test]
+fn nullifier_binds_market_id() {
+    let a = Note { market_id: 1, side: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    let b = Note { market_id: 2, side: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    assert(a.nullifier() != b.nullifier());
+}
+
+#[test]
+fn nullifier_ignores_side_amount_and_secret() {
+    // The nullifier must depend ONLY on (nullifier_secret, market_id): a note
+    // has exactly one nullifier regardless of its side, amount, or blinding
+    // secret, so a holder cannot mint extra nullifiers for the same slot.
+    let a = Note { market_id: 1, side: 0, amount: 100, secret: 42, nullifier_secret: 7 };
+    let b = Note { market_id: 1, side: 1, amount: 999, secret: 43, nullifier_secret: 7 };
+    assert(a.nullifier() == b.nullifier());
+}
+
+#[test]
+fn nullifier_differs_from_commitment() {
+    let note = Note { market_id: 1, side: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    assert(note.nullifier() != note.commitment());
 }
