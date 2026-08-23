@@ -10,4 +10,6 @@
 //! The Poseidon hashing follows the same pattern used in the author's prior
 //! ZK-AfterLife project (`poseidon::poseidon::bn254::hash_*`).
 
-// Primitives are added in the tasks noted above.
+pub mod note;
+
+pub use note::Note;
