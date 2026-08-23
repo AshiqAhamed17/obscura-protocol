@@ -1,0 +1,7 @@
+[package]
+name = "claim"
+type = "bin"
+authors = ["Ashiq Ahamed"]
+
+[dependencies]
+obscura = { path = "../lib" }

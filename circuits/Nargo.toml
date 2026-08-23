@@ -1,3 +1,2 @@
 [workspace]
-members = ["lib"]
-default-member = "lib"
+members = ["lib", "claim"]

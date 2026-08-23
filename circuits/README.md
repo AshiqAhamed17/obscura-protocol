@@ -11,9 +11,10 @@ without revealing which note is theirs.
 circuits/
   Nargo.toml        workspace
   lib/              `obscura` library crate — reusable ZK primitives:
-    src/lib.nr        note commitment (1.2), Merkle membership (1.3),
-                      nullifier derivation (1.4)
-  claim/            claim binary circuit (added in task 1.5)
+    src/note.nr       note format, commitment (1.2), nullifier (1.4)
+    src/merkle.nr     Merkle membership proof (1.3)
+  claim/            `claim` binary circuit (1.5) — proves the right to a
+    src/main.nr       payout: membership + winning side + nullifier
 ```
 
 The primitives live in a **library** crate so the deposit/claim binaries
