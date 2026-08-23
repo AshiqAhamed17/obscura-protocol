@@ -1,0 +1,10 @@
+[package]
+name = "guest"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+aggregation = { path = "../aggregation" }
+
+# sp1-zkvm is added here once the SP1 toolchain (`sp1up` / `cargo prove`) is
+# installed for Milestone 2 — see README.md in this directory.

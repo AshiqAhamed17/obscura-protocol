@@ -1,0 +1,10 @@
+/target
+.env
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+# Local planning / strategy docs — kept out of the public repo
+plan.md
+project-overview.md
+tasks.md
