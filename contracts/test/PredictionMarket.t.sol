@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {MockHonkVerifier} from "./mocks/MockHonkVerifier.sol";
+import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
 
 contract PredictionMarketTest is Test {
     uint8 constant DECIMALS = 8;
@@ -17,6 +18,8 @@ contract PredictionMarketTest is Test {
     PredictionMarket market;
     MockV3Aggregator feed;
     MockHonkVerifier verifier;
+    MockSP1Verifier sp1Verifier;
+    bytes32 constant PROGRAM_VKEY = bytes32(uint256(0x5f1));
 
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -29,8 +32,9 @@ contract PredictionMarketTest is Test {
 
     function setUp() public {
         verifier = new MockHonkVerifier();
+        sp1Verifier = new MockSP1Verifier();
         // The deployer (this test contract) becomes the operator.
-        market = new PredictionMarket(address(verifier));
+        market = new PredictionMarket(address(verifier), address(sp1Verifier), PROGRAM_VKEY);
         feed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
 
         vm.deal(alice, 100 ether);
@@ -222,6 +226,71 @@ contract PredictionMarketTest is Test {
 
         vm.expectRevert(PredictionMarket.TotalsMismatch.selector);
         market.settle(id, _c(999), 2 ether, 1 ether); // 3 != 4
+    }
+
+    // --- settleWithProof (trustless, SP1-verified) ---
+
+    function _resolvedMarketWithPool(uint256 poolEach) internal returns (uint256 id) {
+        id = _createMarket(3_000e8, block.timestamp + 1 days);
+        vm.prank(alice);
+        market.deposit{value: poolEach}(id, _c(111));
+        vm.prank(bob);
+        market.deposit{value: poolEach}(id, _c(222));
+        _resolve(id);
+    }
+
+    function _encodeSettlement(uint64 id, uint64 ty, uint64 tn, bytes32 root)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        PredictionMarket.SettlementValues[] memory vals = new PredictionMarket.SettlementValues[](1);
+        vals[0] = PredictionMarket.SettlementValues({marketId: id, totalYes: ty, totalNo: tn, merkleRoot: root});
+        return abi.encode(vals);
+    }
+
+    function test_settleWithProof_settlesFromDecodedValues() public {
+        uint256 id = _resolvedMarketWithPool(1 ether); // pool = 2 ether
+        bytes memory pv = _encodeSettlement(uint64(id), 1 ether, 1 ether, _c(0xABCD));
+
+        vm.expectEmit(true, false, false, true);
+        emit MarketSettled(id, _c(0xABCD), 1 ether, 1 ether);
+        market.settleWithProof(pv, hex"01");
+
+        (,,,, PredictionMarket.Status status,,,, bytes32 root, uint256 ty, uint256 tn) = market.markets(id);
+        assertEq(uint8(status), uint8(PredictionMarket.Status.Settled));
+        assertEq(root, _c(0xABCD));
+        assertEq(ty, 1 ether);
+        assertEq(tn, 1 ether);
+    }
+
+    function test_settleWithProof_revertsOnInvalidProof() public {
+        uint256 id = _resolvedMarketWithPool(1 ether);
+        bytes memory pv = _encodeSettlement(uint64(id), 1 ether, 1 ether, _c(0xABCD));
+
+        sp1Verifier.setShouldReject(true);
+        vm.expectRevert(bytes("SP1: invalid proof"));
+        market.settleWithProof(pv, hex"01");
+    }
+
+    function test_settleWithProof_revertsOnTotalsMismatch() public {
+        uint256 id = _resolvedMarketWithPool(1 ether); // pool = 2 ether
+        // totals sum to 3 ether, not the escrowed 2 ether
+        bytes memory pv = _encodeSettlement(uint64(id), 2 ether, 1 ether, _c(0xABCD));
+
+        vm.expectRevert(PredictionMarket.TotalsMismatch.selector);
+        market.settleWithProof(pv, hex"01");
+    }
+
+    function test_settleWithProof_revertsIfMarketNotResolved() public {
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+        vm.prank(alice);
+        market.deposit{value: 2 ether}(id, _c(111));
+        // not resolved
+        bytes memory pv = _encodeSettlement(uint64(id), 2 ether, 0, _c(0xABCD));
+
+        vm.expectRevert(PredictionMarket.MarketNotResolved.selector);
+        market.settleWithProof(pv, hex"01");
     }
 
     // --- claim ---

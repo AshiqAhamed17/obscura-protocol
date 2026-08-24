@@ -18,6 +18,8 @@ use ark_ff::{BigInteger, PrimeField};
 use light_poseidon::{Poseidon, PoseidonHasher};
 use serde::{Deserialize, Serialize};
 
+pub mod public_values;
+
 /// Depth of the commitments Merkle tree. Must match `MERKLE_DEPTH` in the Noir
 /// `obscura` library and the on-chain tree.
 pub const MERKLE_DEPTH: usize = 20;

@@ -9,6 +9,14 @@ interface IHonkVerifier {
     function verify(bytes calldata proof, bytes32[] calldata publicInputs) external view returns (bool);
 }
 
+/// @notice SP1 on-chain verifier interface (SP1VerifierGateway). Reverts if the
+///         proof is invalid.
+interface ISP1Verifier {
+    function verifyProof(bytes32 programVKey, bytes calldata publicValues, bytes calldata proofBytes)
+        external
+        view;
+}
+
 /// @title PredictionMarket (Milestone 1 — private positions & verified claims)
 /// @notice Price-threshold prediction markets resolved by a Chainlink Price
 ///         Feed. Positions are private: a deposit escrows collateral and
@@ -46,6 +54,15 @@ contract PredictionMarket {
         Settled
     }
 
+    /// One market's proven settlement, ABI-decoded from an SP1 proof's public
+    /// values. Layout must match `aggregation::public_values::SettlementValues`.
+    struct SettlementValues {
+        uint64 marketId;
+        uint64 totalYes;
+        uint64 totalNo;
+        bytes32 merkleRoot;
+    }
+
     struct Market {
         AggregatorV3Interface priceFeed;
         int256 threshold;
@@ -66,6 +83,9 @@ contract PredictionMarket {
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     IHonkVerifier public immutable verifier;
+    ISP1Verifier public immutable sp1Verifier;
+    /// Verifying-key hash of the batch-settlement SP1 program.
+    bytes32 public immutable programVKey;
     address public immutable operator;
 
     uint256 public marketCount;
@@ -111,8 +131,12 @@ contract PredictionMarket {
     }
 
     /// @param verifier_ Address of the deployed UltraHonk claim verifier.
-    constructor(address verifier_) {
+    /// @param sp1Verifier_ Address of the SP1 verifier (gateway).
+    /// @param programVKey_ Verifying-key hash of the batch-settlement SP1 program.
+    constructor(address verifier_, address sp1Verifier_, bytes32 programVKey_) {
         verifier = IHonkVerifier(verifier_);
+        sp1Verifier = ISP1Verifier(sp1Verifier_);
+        programVKey = programVKey_;
         operator = msg.sender;
     }
 
@@ -195,6 +219,42 @@ contract PredictionMarket {
         m.status = Status.Settled;
 
         emit MarketSettled(marketId, merkleRoot, totalYes, totalNo);
+    }
+
+    /// @notice Trustlessly settles a batch of resolved markets from an SP1
+    ///         proof. The proof attests that, for every market in
+    ///         `publicValues`, the per-side totals and commitments-tree root
+    ///         were correctly computed from that market's committed notes — so
+    ///         no operator is trusted for the numbers. Permissionless: anyone
+    ///         holding a valid proof can settle.
+    /// @param publicValues ABI-encoded `SettlementValues[]` (the proof's public
+    ///        values, produced by the SP1 guest).
+    /// @param proofBytes   SP1 proof bytes.
+    function settleWithProof(bytes calldata publicValues, bytes calldata proofBytes) external {
+        // Reverts if the proof does not attest to `publicValues` under the
+        // batch-settlement program's verifying key.
+        sp1Verifier.verifyProof(programVKey, publicValues, proofBytes);
+
+        SettlementValues[] memory settlements = abi.decode(publicValues, (SettlementValues[]));
+
+        for (uint256 i = 0; i < settlements.length; i++) {
+            SettlementValues memory s = settlements[i];
+            Market storage m = markets[s.marketId];
+            if (m.status != Status.Resolved) revert MarketNotResolved();
+
+            uint256 totalYes = uint256(s.totalYes);
+            uint256 totalNo = uint256(s.totalNo);
+            // Defense in depth: the proof already ties totals to the notes, but
+            // they must still reconcile with the escrowed collateral on-chain.
+            if (totalYes + totalNo != m.totalPool) revert TotalsMismatch();
+
+            m.merkleRoot = s.merkleRoot;
+            m.totalYes = totalYes;
+            m.totalNo = totalNo;
+            m.status = Status.Settled;
+
+            emit MarketSettled(s.marketId, s.merkleRoot, totalYes, totalNo);
+        }
     }
 
     /// @notice Claims a pari-mutuel payout for a winning note, in zero

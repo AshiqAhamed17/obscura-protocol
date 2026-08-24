@@ -17,7 +17,7 @@
 #![no_main]
 sp1_zkvm::entrypoint!(main);
 
-use aggregation::{settle_batch, MarketNotes, MarketSettlement};
+use aggregation::{public_values, settle_batch, MarketNotes, MarketSettlement};
 
 pub fn main() {
     let markets = sp1_zkvm::io::read::<Vec<MarketNotes>>();
@@ -27,5 +27,7 @@ pub fn main() {
     let settlements: Vec<MarketSettlement> =
         settle_batch(&markets).expect("batch settlement failed");
 
-    sp1_zkvm::io::commit(&settlements);
+    // Commit the settlements ABI-encoded so the on-chain contract can
+    // abi.decode the proof's public values directly.
+    sp1_zkvm::io::commit_slice(&public_values::encode(&settlements));
 }

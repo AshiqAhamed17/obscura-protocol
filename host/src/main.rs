@@ -8,7 +8,7 @@
 //!   cargo run --release -p host              # execute-only
 //!   cargo run --release -p host -- --prove   # prove + verify + save
 
-use aggregation::{settle_batch, MarketNotes, MarketSettlement, Note, Side};
+use aggregation::{public_values, settle_batch, MarketNotes, Note, Side};
 use sp1_sdk::blocking::{ProveRequest, Prover, ProverClient};
 use sp1_sdk::{include_elf, Elf, ProvingKey, SP1Stdin};
 
@@ -52,9 +52,9 @@ fn stdin_for(batch: &[MarketNotes]) -> SP1Stdin {
 fn execute_all(client: &impl Prover) {
     for (label, batch) in [("one market", one_market()), ("several markets", several_markets())] {
         println!("executing: {label}");
-        let (mut pv, report) =
+        let (pv, report) =
             client.execute(GUEST_ELF, stdin_for(&batch)).run().expect("execution failed");
-        let got = pv.read::<Vec<MarketSettlement>>();
+        let got = public_values::decode(pv.as_slice());
         let expected = settle_batch(&batch).expect("reference settlement failed");
         assert_eq!(got, expected, "guest settlement mismatch for {label}");
         println!("  markets: {}, cycles: {}, OK", batch.len(), report.total_instruction_count());
@@ -83,8 +83,7 @@ fn prove_one(client: &impl Prover) {
     println!("proof verified.");
 
     // The public values carry the same settlements the guest committed.
-    let mut pv = proof.public_values.clone();
-    let committed = pv.read::<Vec<MarketSettlement>>();
+    let committed = public_values::decode(proof.public_values.as_slice());
     assert_eq!(committed, expected, "committed public values mismatch");
     println!("committed public values: {committed:?}");
 
@@ -93,12 +92,31 @@ fn prove_one(client: &impl Prover) {
     println!("proof + public values saved to {PROOF_PATH}");
 }
 
+/// Writes the ABI-encoded public values for the `several_markets` batch to a
+/// fixture so the Foundry tests can `abi.decode` real Rust-produced bytes
+/// (cross-tool ABI compatibility check + input for the settleWithProof test).
+fn dump_values() {
+    let batch = several_markets();
+    let settlements = settle_batch(&batch).expect("reference settlement failed");
+    let encoded = public_values::encode(&settlements);
+    std::fs::create_dir_all("contracts/test/fixtures").expect("create fixtures dir");
+    std::fs::write("contracts/test/fixtures/sample_public_values.bin", &encoded)
+        .expect("write fixture");
+    println!("wrote {} bytes of ABI-encoded public values", encoded.len());
+    println!("settlements: {settlements:?}");
+}
+
 fn main() {
     sp1_sdk::utils::setup_logger();
-    let prove = std::env::args().any(|a| a == "--prove");
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.iter().any(|a| a == "--dump-values") {
+        dump_values();
+        return;
+    }
 
     let client = ProverClient::from_env();
-    if prove {
+    if args.iter().any(|a| a == "--prove") {
         prove_one(&client);
     } else {
         execute_all(&client);

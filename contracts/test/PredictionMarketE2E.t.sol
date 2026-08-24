@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {HonkVerifier} from "../src/verifiers/HonkVerifier.sol";
+import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
 
 /// @notice End-to-end test against the REAL UltraHonk verifier using a real
 ///         proof generated offline (see circuits/generate-fixture.sh). Proves
@@ -40,7 +41,8 @@ contract PredictionMarketE2ETest is Test {
 
     function setUp() public {
         verifier = new HonkVerifier();
-        market = new PredictionMarket(address(verifier));
+        MockSP1Verifier sp1Verifier = new MockSP1Verifier();
+        market = new PredictionMarket(address(verifier), address(sp1Verifier), bytes32(uint256(0x5f1)));
         feed = new MockV3Aggregator(DECIMALS, PRICE_YES);
 
         vm.deal(alice, 100 ether);
