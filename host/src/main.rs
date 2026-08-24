@@ -10,7 +10,7 @@
 
 use aggregation::{public_values, settle_batch, MarketNotes, Note, Side};
 use sp1_sdk::blocking::{ProveRequest, Prover, ProverClient};
-use sp1_sdk::{include_elf, Elf, ProvingKey, SP1Stdin};
+use sp1_sdk::{include_elf, Elf, HashableKey, ProvingKey, SP1Stdin};
 
 const GUEST_ELF: Elf = include_elf!("guest");
 const PROOF_PATH: &str = "host/proofs/batch_proof.bin";
@@ -106,6 +106,32 @@ fn dump_values() {
     println!("settlements: {settlements:?}");
 }
 
+/// Generates an EVM-verifiable Groth16 proof of the batch and writes the
+/// artifacts needed to settle on-chain: the proof bytes and ABI-encoded public
+/// values (feed straight into `PredictionMarket.settleWithProof`), plus the
+/// program verifying-key hash for the contract's `programVKey`.
+///
+/// Groth16 proving is heavy — run it on the Succinct Prover Network:
+///   SP1_PROVER=network NETWORK_PRIVATE_KEY=0x... cargo run --release -p host -- --evm
+fn prove_evm(client: &impl Prover) {
+    let batch = one_market();
+    let pk = client.setup(GUEST_ELF).expect("setup failed");
+    println!("programVKey: {}", pk.verifying_key().bytes32());
+
+    println!("generating Groth16 (EVM) proof...");
+    let proof = client.prove(&pk, stdin_for(&batch)).groth16().run().expect("groth16 proving failed");
+
+    client.verify(&proof, pk.verifying_key(), None).expect("verification failed");
+    println!("proof verified.");
+
+    std::fs::create_dir_all("host/proofs").expect("create proofs dir");
+    std::fs::write("host/proofs/batch_proof_evm.bin", proof.bytes()).expect("write proof");
+    std::fs::write("host/proofs/batch_public_values.bin", proof.public_values.as_slice())
+        .expect("write public values");
+    println!("wrote host/proofs/batch_proof_evm.bin + batch_public_values.bin");
+    println!("-> call settleWithProof(publicValues, proofBytes) on-chain with these.");
+}
+
 fn main() {
     sp1_sdk::utils::setup_logger();
     let args: Vec<String> = std::env::args().collect();
@@ -116,7 +142,9 @@ fn main() {
     }
 
     let client = ProverClient::from_env();
-    if args.iter().any(|a| a == "--prove") {
+    if args.iter().any(|a| a == "--evm") {
+        prove_evm(&client);
+    } else if args.iter().any(|a| a == "--prove") {
         prove_one(&client);
     } else {
         execute_all(&client);

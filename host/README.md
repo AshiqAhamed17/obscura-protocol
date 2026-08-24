@@ -51,6 +51,35 @@ exceeds a 16GB machine's RAM (OOM). So:
   (`SP1_PROVER=network`) or a higher-RAM machine. A custom BN254-field
   precompile would be the path to making it CPU-provable locally (future work).
 
+## Real proof on-chain (Succinct Prover Network) — ready to run
+
+The whole trustless-settlement path is wired and tested against a mock SP1
+verifier; swapping in a real proof is these steps (no code changes):
+
+1. Get a Succinct Prover Network key (https://docs.succinct.xyz), then generate
+   an EVM (Groth16) proof of the batch on the network:
+
+   ```bash
+   SP1_PROVER=network NETWORK_PRIVATE_KEY=0x... \
+     cargo run --release -p host -- --evm
+   ```
+
+   This prints the program `programVKey` and writes:
+   - `host/proofs/batch_proof_evm.bin`     — the on-chain proof bytes
+   - `host/proofs/batch_public_values.bin` — ABI-encoded `SettlementValues[]`
+
+2. Deploy `PredictionMarket` with SP1's canonical `SP1VerifierGateway` address
+   for the target chain and the `programVKey` from step 1.
+
+3. Settle on-chain by calling
+   `settleWithProof(batch_public_values, batch_proof_evm)` — the gateway
+   verifies the proof and the contract settles every market in the batch from
+   the proven totals + roots. This is the M3 demo moment.
+
+Contract-level end-to-end (deposit → resolve → settleWithProof over a real
+Rust-encoded batch → per-market proven totals) is covered today by
+`contracts/test/PredictionMarketBatchE2E.t.sol` using the mock verifier.
+
 > Plain `cargo test` at the repo root does NOT build this crate (it is excluded
 > from `default-members`), so the fast aggregation tests never require the SP1
 > toolchain. Build/run the prover explicitly with `-p host`.
