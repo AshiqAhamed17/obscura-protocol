@@ -14,13 +14,30 @@
 //! root.
 
 pub use ark_bn254::Fr;
+use ark_ff::{BigInteger, PrimeField};
 use light_poseidon::{Poseidon, PoseidonHasher};
+use serde::{Deserialize, Serialize};
 
 /// Depth of the commitments Merkle tree. Must match `MERKLE_DEPTH` in the Noir
 /// `obscura` library and the on-chain tree.
 pub const MERKLE_DEPTH: usize = 20;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A field element serialized as 32 big-endian bytes. Used for note secrets and
+/// committed roots so every type crossing the SP1 io boundary is plain serde.
+pub type FieldBytes = [u8; 32];
+
+fn to_fr(bytes: &FieldBytes) -> Fr {
+    Fr::from_be_bytes_mod_order(bytes)
+}
+
+fn fr_to_bytes(f: Fr) -> FieldBytes {
+    let v = f.into_bigint().to_bytes_be(); // <= 32 bytes, big-endian
+    let mut out = [0u8; 32];
+    out[32 - v.len()..].copy_from_slice(&v);
+    out
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Side {
     Yes,
     No,
@@ -39,12 +56,14 @@ impl Side {
 
 /// A trader's note. Carries every field needed to recompute its on-chain
 /// commitment; `market_id` is supplied by the enclosing [`MarketNotes`].
-#[derive(Debug, Clone, Copy)]
+/// Secrets are field elements stored as 32 big-endian bytes so the type is
+/// plain serde (readable across the SP1 io boundary).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Note {
     pub side: Side,
     pub amount: u64,
-    pub secret: Fr,
-    pub nullifier_secret: Fr,
+    pub secret: FieldBytes,
+    pub nullifier_secret: FieldBytes,
 }
 
 impl Note {
@@ -55,19 +74,19 @@ impl Note {
             Fr::from(market_id),
             self.side.to_field(),
             Fr::from(self.amount),
-            self.secret,
-            self.nullifier_secret,
+            to_fr(&self.secret),
+            to_fr(&self.nullifier_secret),
         ])
     }
 
     /// Nullifier — identical to `Note::nullifier` in the Noir library.
     pub fn nullifier(&self, market_id: u64) -> Fr {
-        hash2(self.nullifier_secret, Fr::from(market_id))
+        hash2(to_fr(&self.nullifier_secret), Fr::from(market_id))
     }
 }
 
 /// One resolved market's full set of committed notes, ready to settle.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketNotes {
     pub market_id: u64,
     pub escrowed_collateral: u64,
@@ -82,10 +101,16 @@ impl MarketNotes {
         let leaves: Vec<Fr> = self.notes.iter().map(|n| n.commitment(self.market_id)).collect();
         merkle_root(&leaves)
     }
+
+    /// The reconstructed root as 32 big-endian bytes (for committing/comparing
+    /// against an on-chain `bytes32` root).
+    pub fn merkle_root_bytes(&self) -> FieldBytes {
+        fr_to_bytes(self.merkle_root())
+    }
 }
 
 /// The proven, public result of settling one market.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarketSettlement {
     pub market_id: u64,
     pub total_yes: u64,
@@ -191,7 +216,14 @@ mod tests {
     use ark_ff::{BigInteger, PrimeField};
 
     fn note(side: Side, amount: u64) -> Note {
-        Note { side, amount, secret: Fr::from(0u64), nullifier_secret: Fr::from(0u64) }
+        Note { side, amount, secret: [0u8; 32], nullifier_secret: [0u8; 32] }
+    }
+
+    /// A u64 as a 32-byte big-endian field element (for test secrets).
+    fn be32(n: u64) -> [u8; 32] {
+        let mut b = [0u8; 32];
+        b[24..].copy_from_slice(&n.to_be_bytes());
+        b
     }
 
     fn to_hex(f: Fr) -> String {
@@ -324,8 +356,8 @@ mod tests {
         let n = Note {
             side: Side::Yes,
             amount: 1_000_000_000_000_000_000,
-            secret: Fr::from(111111u64),
-            nullifier_secret: Fr::from(222222u64),
+            secret: be32(111111),
+            nullifier_secret: be32(222222),
         };
         assert_eq!(
             to_hex(n.commitment(0)),

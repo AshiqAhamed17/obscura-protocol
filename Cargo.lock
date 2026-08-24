@@ -35,6 +35,7 @@ dependencies = [
  "ark-bn254",
  "ark-ff",
  "light-poseidon",
+ "serde",
 ]
 
 [[package]]
@@ -1537,6 +1538,7 @@ dependencies = [
 name = "host"
 version = "0.1.0"
 dependencies = [
+ "aggregation",
  "sp1-build",
  "sp1-sdk",
 ]
