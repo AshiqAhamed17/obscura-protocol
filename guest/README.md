@@ -1,22 +1,23 @@
-# guest
+# guest — Obscura SP1 zkVM program
 
-Placeholder for the Milestone 2 SP1 guest program. It currently builds as a
-plain binary so `cargo build`/`cargo test` work across the workspace without
-the SP1 toolchain installed.
+The zkVM program whose execution is proven. It is built for the RISC-V
+`succinct` target via `cargo prove` (invoked automatically by `../host`'s
+`build.rs`), so it is intentionally its own workspace and NOT a member of the
+repo's root workspace — that keeps `cargo test`/`cargo build` at the root
+building only host-target crates.
 
-## Turning this into a real SP1 guest (Milestone 2)
+- **2.1 (done):** trivial program (read `u32`, commit `2n`) proving the SP1
+  build → execute → read pipeline works.
+- **2.2:** read a variable-size `Vec<MarketNotes>`, call
+  `aggregation::settle_batch`, commit the `Vec<MarketSettlement>`.
+- **2.3:** reconstruct each market's Poseidon Merkle root
+  (`aggregation::merkle_root`) and commit it, tying notes to the on-chain root.
 
-1. Install the toolchain: `curl -L https://sp1.succinct.xyz | bash && sp1up`,
-   then `cargo prove new` conventions apply here (this crate already matches
-   the expected guest-crate layout).
-2. Add `sp1-zkvm` as a dependency and call `sp1_zkvm::entrypoint!(main)`.
-3. Replace the placeholder input in `main.rs` with `sp1_zkvm::io::read::<Vec<MarketNotes>>()`,
-   and commit the resulting `Vec<MarketSettlement>` via `sp1_zkvm::io::commit(&settlements)`.
-4. Add per-note Merkle-path verification (against each market's on-chain
-   commitment root) before calling `settle_batch`, using SP1's **precompiled**
-   keccak/sha256 hashing rather than a hand-rolled hash — 5-10x cheaper in
-   cycles (see `plan.md` at the repo root for why this matters).
-5. Build a small host program (outside this crate) that loads real market/note
-   data, invokes the SP1 prover, and verifies the resulting proof locally
-   before wiring it up to the on-chain verifier in Milestone 2's settlement
-   contract update.
+## Build directly
+
+```bash
+export PATH="$HOME/.cargo/bin:$HOME/.sp1/bin:$PATH"
+cargo prove build
+```
+
+See `../host/README.md` for prerequisites (SP1 toolchain, protoc, PATH).

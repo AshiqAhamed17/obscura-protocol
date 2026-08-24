@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["aggregation", "guest"]
+members = ["aggregation", "host"]
+# `cargo test` / `cargo build` with no -p only touch aggregation, keeping the
+# fast Rust tests independent of the SP1 toolchain. Build/run the prover
+# explicitly with `-p host` (it needs SP1 + protoc; see host/README.md).
+default-members = ["aggregation"]
 
 [workspace.package]
 edition = "2021"

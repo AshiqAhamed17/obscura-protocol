@@ -1,4 +1,5 @@
 /target
+guest/target/
 .env
 contracts/cache/
 contracts/out/

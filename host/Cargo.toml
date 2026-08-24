@@ -1,0 +1,10 @@
+[package]
+name = "host"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+sp1-sdk = { version = "6.0.1", features = ["blocking"] }
+
+[build-dependencies]
+sp1-build = "6.0.1"
