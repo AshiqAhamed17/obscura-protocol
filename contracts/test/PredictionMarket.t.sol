@@ -10,12 +10,16 @@ contract PredictionMarketTest is Test {
     int256 constant INITIAL_PRICE = 3_000e8; // $3000
     uint256 constant MAX_STALENESS = 1 hours;
 
+    uint256 constant FIELD_MODULUS =
+        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
     PredictionMarket market;
     MockV3Aggregator feed;
 
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
-    address carol = makeAddr("carol");
+
+    event Deposit(uint256 indexed marketId, bytes32 indexed commitment, uint256 leafIndex, uint256 amount);
 
     function setUp() public {
         market = new PredictionMarket();
@@ -23,12 +27,17 @@ contract PredictionMarketTest is Test {
 
         vm.deal(alice, 100 ether);
         vm.deal(bob, 100 ether);
-        vm.deal(carol, 100 ether);
     }
 
     function _createMarket(int256 threshold, uint256 resolveAfter) internal returns (uint256) {
         return market.createMarket(address(feed), threshold, resolveAfter, MAX_STALENESS);
     }
+
+    function _c(uint256 v) internal pure returns (bytes32) {
+        return bytes32(v);
+    }
+
+    // --- createMarket ---
 
     function test_createMarket_incrementsId() public {
         uint256 id0 = _createMarket(3_000e8, block.timestamp + 1 days);
@@ -38,36 +47,85 @@ contract PredictionMarketTest is Test {
         assertEq(market.marketCount(), 2);
     }
 
-    function test_takePosition_tracksAmountsPerSide() public {
+    // --- deposit / commitments tree ---
+
+    function test_deposit_storesCommitmentAndEscrows() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
 
         vm.prank(alice);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
+        uint256 leafIndex = market.deposit{value: 1 ether}(id, _c(111));
 
-        vm.prank(bob);
-        market.takePosition{value: 2 ether}(id, PredictionMarket.Side.No);
+        assertEq(leafIndex, 0);
+        assertEq(market.commitmentAt(id, 0), _c(111));
+        assertEq(address(market).balance, 1 ether);
 
-        (,,,,, PredictionMarket.Side winningSide, uint256 totalYes, uint256 totalNo) = market.markets(id);
-        winningSide; // silence unused warning for tuple field before resolution
-        assertEq(totalYes, 1 ether);
-        assertEq(totalNo, 2 ether);
+        (,,,,,, uint256 totalPool, uint256 depositCount) = market.markets(id);
+        assertEq(totalPool, 1 ether);
+        assertEq(depositCount, 1);
     }
 
-    function test_takePosition_revertsOnZeroValue() public {
+    function test_deposit_emitsEventWithLeafIndex() public {
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+
+        vm.expectEmit(true, true, false, true);
+        emit Deposit(id, _c(222), 0, 2 ether);
+
+        vm.prank(alice);
+        market.deposit{value: 2 ether}(id, _c(222));
+    }
+
+    function test_deposit_multiple_appendsLeavesInOrderAndSumsPool() public {
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+
+        vm.prank(alice);
+        market.deposit{value: 1 ether}(id, _c(111));
+        vm.prank(bob);
+        market.deposit{value: 3 ether}(id, _c(222));
+
+        bytes32[] memory leaves = market.getCommitments(id);
+        assertEq(leaves.length, 2);
+        assertEq(leaves[0], _c(111));
+        assertEq(leaves[1], _c(222));
+
+        (,,,,,, uint256 totalPool, uint256 depositCount) = market.markets(id);
+        assertEq(totalPool, 4 ether);
+        assertEq(depositCount, 2);
+    }
+
+    function test_deposit_revertsOnZeroValue() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
         vm.prank(alice);
         vm.expectRevert(PredictionMarket.ZeroAmount.selector);
-        market.takePosition{value: 0}(id, PredictionMarket.Side.Yes);
+        market.deposit{value: 0}(id, _c(111));
     }
 
-    function test_takePosition_revertsAfterResolution() public {
+    function test_deposit_revertsOnOutOfFieldCommitment() public {
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+        vm.prank(alice);
+        vm.expectRevert(PredictionMarket.CommitmentOutOfField.selector);
+        market.deposit{value: 1 ether}(id, bytes32(FIELD_MODULUS));
+    }
+
+    function test_deposit_revertsOnDuplicateCommitment() public {
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+        vm.prank(alice);
+        market.deposit{value: 1 ether}(id, _c(111));
+
+        vm.prank(bob);
+        vm.expectRevert(PredictionMarket.CommitmentAlreadyUsed.selector);
+        market.deposit{value: 1 ether}(id, _c(111));
+    }
+
+    function test_deposit_revertsAfterResolution() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
         _resolve(id);
 
         vm.prank(alice);
         vm.expectRevert(PredictionMarket.MarketNotOpen.selector);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
+        market.deposit{value: 1 ether}(id, _c(111));
     }
+
+    // --- resolveMarket ---
 
     function test_resolveMarket_revertsBeforeResolveAfter() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
@@ -77,9 +135,8 @@ contract PredictionMarketTest is Test {
 
     function test_resolveMarket_revertsOnStalePrice() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+        // warp past resolveAfter + staleness window without refreshing the feed
         vm.warp(block.timestamp + 1 days + MAX_STALENESS + 1);
-        // feed's updatedAt is still "now" at deploy time, so warp far enough
-        // past resolveAfter + staleness window without refreshing the feed.
         vm.expectRevert(PredictionMarket.StalePrice.selector);
         market.resolveMarket(id);
     }
@@ -101,97 +158,11 @@ contract PredictionMarketTest is Test {
         assertEq(uint8(winningSide), uint8(PredictionMarket.Side.No));
     }
 
-    function test_claim_paysProportionalPariMutuelPayout() public {
+    function test_resolveMarket_revertsIfAlreadyResolved() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-
-        vm.prank(alice);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
-        vm.prank(bob);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
-        vm.prank(carol);
-        market.takePosition{value: 2 ether}(id, PredictionMarket.Side.No);
-
-        _resolve(id); // price stays >= 3000e8 -> Yes wins
-
-        uint256 aliceBefore = alice.balance;
-        vm.prank(alice);
-        market.claim(id);
-        // total pool = 4 ether, total winning (Yes) = 2 ether, alice staked 1 ether
-        // payout = 1 * 4 / 2 = 2 ether
-        assertEq(alice.balance - aliceBefore, 2 ether);
-    }
-
-    function test_claim_revertsForLosingPosition() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-
-        vm.prank(carol);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.No);
-        vm.prank(alice);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
-
-        _resolve(id); // Yes wins
-
-        vm.prank(carol);
-        vm.expectRevert(PredictionMarket.NoWinningPosition.selector);
-        market.claim(id);
-    }
-
-    function test_claim_revertsOnDoubleClaim() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
         _resolve(id);
-
-        vm.prank(alice);
-        market.claim(id);
-
-        vm.prank(alice);
-        vm.expectRevert(PredictionMarket.AlreadyClaimed.selector);
-        market.claim(id);
-    }
-
-    function test_claim_revertsBeforeResolution() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.takePosition{value: 1 ether}(id, PredictionMarket.Side.Yes);
-
-        vm.prank(alice);
-        vm.expectRevert(PredictionMarket.MarketNotResolved.selector);
-        market.claim(id);
-    }
-
-    /// @dev Fuzzes stake sizes across two winning bettors and asserts the pool is
-    ///      never over- or under-paid: sum of payouts <= total pool.
-    function testFuzz_claim_neverExceedsPool(uint96 aliceStake, uint96 bobStake, uint96 carolStake) public {
-        aliceStake = uint96(bound(aliceStake, 1, 50 ether));
-        bobStake = uint96(bound(bobStake, 1, 50 ether));
-        carolStake = uint96(bound(carolStake, 1, 50 ether));
-
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-
-        vm.prank(alice);
-        market.takePosition{value: aliceStake}(id, PredictionMarket.Side.Yes);
-        vm.prank(bob);
-        market.takePosition{value: bobStake}(id, PredictionMarket.Side.Yes);
-        vm.prank(carol);
-        market.takePosition{value: carolStake}(id, PredictionMarket.Side.No);
-
-        _resolve(id); // Yes wins
-
-        uint256 totalPool = uint256(aliceStake) + bobStake + carolStake;
-
-        uint256 aliceBefore = alice.balance;
-        uint256 bobBefore = bob.balance;
-
-        vm.prank(alice);
-        market.claim(id);
-        vm.prank(bob);
-        market.claim(id);
-
-        uint256 alicePayout = alice.balance - aliceBefore;
-        uint256 bobPayout = bob.balance - bobBefore;
-
-        assertLe(alicePayout + bobPayout, totalPool);
+        vm.expectRevert(PredictionMarket.MarketNotOpen.selector);
+        market.resolveMarket(id);
     }
 
     function _resolve(uint256 id) internal {
