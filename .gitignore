@@ -10,7 +10,10 @@ contracts/broadcast/
 circuits/**/target/
 circuits/**/export/
 
-# Local planning / strategy docs — kept out of the public repo
+# Local planning / strategy / learning docs — kept out of the public repo
 plan.md
 project-overview.md
 tasks.md
+docs/learn/
+# Design reference screenshots (third-party, local only)
+design/
