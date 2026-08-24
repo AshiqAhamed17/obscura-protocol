@@ -79,6 +79,9 @@ Trader ──(private deposit note)──▶ Market/Escrow Contract (Solidity)
 - Withdrawal is *unlinkable*, not amount-hiding — the same privacy model as
   the author's prior ZK-AfterLife project.
 
+Full analysis — what's cryptographically guaranteed vs. assumed vs. out of
+scope — is in [`docs/trust-model.md`](./docs/trust-model.md).
+
 ## Tech stack
 
 | Layer | Tech |
