@@ -1,0 +1,15 @@
+# Fixture witness for the end-to-end Foundry test (task 1.9).
+# Derived values (merkle_root, nullifier) come from `nargo execute --package
+# fixture_gen`. recipient = 0xCAFEBABE (= 3405691582). Regenerate the proof
+# with ../generate-fixture.sh after any change here.
+merkle_root = "0x17caadfb8dac906410d1b4adf67325ce166d73eb47ae5c3dce3e97eb86ac1d95"
+market_id = "0"
+winning_side = "1"
+amount = "1000000000000000000"
+nullifier = "0x0d7b4a7191654350afa3eec27d6216350a8a7733f27035403ab7cea34a015e35"
+recipient = "3405691582"
+side = "1"
+secret = "111111"
+nullifier_secret = "222222"
+path_indices = ["0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
+path_siblings = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
