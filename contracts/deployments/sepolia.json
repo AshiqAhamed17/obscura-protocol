@@ -1,0 +1,20 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "contracts": {
+    "PredictionMarket": {
+      "address": "0x7359B433E925e6e788e6Cd377D02F4e86d76EdF5",
+      "verified": true,
+      "explorer": "https://sepolia.etherscan.io/address/0x7359B433E925e6e788e6Cd377D02F4e86d76EdF5"
+    },
+    "HonkVerifier": {
+      "address": "0xd8Fd323155064bfB42378D1Db442aeA3bAE7d8d0",
+      "verified": false,
+      "explorer": "https://sepolia.etherscan.io/address/0xd8Fd323155064bfB42378D1Db442aeA3bAE7d8d0"
+    }
+  },
+  "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
+  "chainlinkEthUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+  "programVKey": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "notes": "programVKey is a 0x0 placeholder — deposits and resolution are functional; settleWithProof rejects proofs until the real vkey (from a network-generated proof) is set and the contract redeployed."
+}

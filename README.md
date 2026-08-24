@@ -2,6 +2,11 @@
 
 > **A zkVM proves that an entire batch of private prediction markets settled correctly and solvently — without any individual position ever being revealed.**
 
+**Live on Sepolia** — `PredictionMarket` (verified):
+[`0x7359…EdF5`](https://sepolia.etherscan.io/address/0x7359B433E925e6e788e6Cd377D02F4e86d76EdF5)
+· resolves against Chainlink ETH/USD · deposits & resolution functional
+(see [deployment notes](./contracts/deployments/sepolia.json)).
+
 Prediction markets (Polymarket, Kalshi, Augur) make every position public,
 leaking strategy and inviting front-running on correlated markets. A few
 projects have started hiding *individual* positions with ZK circuits — but
