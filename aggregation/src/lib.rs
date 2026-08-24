@@ -1,4 +1,4 @@
-//! Batch settlement logic for Obscura Protocol.
+//! Batch settlement + Merkle-root reconstruction for Obscura Protocol.
 //!
 //! This crate is plain Rust with no SP1 dependency, unit-tested on its own,
 //! then compiled unmodified into the `guest` crate's SP1 program (Milestone
@@ -6,9 +6,19 @@
 //! the SP1 guest — means it can be tested fast, without a prover, and the
 //! guest stays a thin wrapper around it.
 //!
-//! Per-note Merkle-membership verification (against each market's on-chain
-//! commitment root) is added here once the Noir note format lands in
-//! Milestone 1; for now this crate settles a batch of already-known notes.
+//! The Poseidon hashing here is verified byte-compatible with the Noir
+//! circuits' `poseidon::poseidon::bn254::hash_*` (see the compatibility tests
+//! against fixtures produced by the Noir `fixture_gen` circuit). That
+//! compatibility is what lets the SP1 guest recompute commitments and the
+//! Merkle root and have them match the Noir claim circuit and the on-chain
+//! root.
+
+pub use ark_bn254::Fr;
+use light_poseidon::{Poseidon, PoseidonHasher};
+
+/// Depth of the commitments Merkle tree. Must match `MERKLE_DEPTH` in the Noir
+/// `obscura` library and the on-chain tree.
+pub const MERKLE_DEPTH: usize = 20;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
@@ -16,10 +26,44 @@ pub enum Side {
     No,
 }
 
+impl Side {
+    /// Field encoding used inside the note commitment. Matches the Noir
+    /// convention: 0 = No, 1 = Yes.
+    fn to_field(self) -> Fr {
+        match self {
+            Side::No => Fr::from(0u64),
+            Side::Yes => Fr::from(1u64),
+        }
+    }
+}
+
+/// A trader's note. Carries every field needed to recompute its on-chain
+/// commitment; `market_id` is supplied by the enclosing [`MarketNotes`].
 #[derive(Debug, Clone, Copy)]
 pub struct Note {
     pub side: Side,
     pub amount: u64,
+    pub secret: Fr,
+    pub nullifier_secret: Fr,
+}
+
+impl Note {
+    /// Poseidon commitment binding all note fields — identical to
+    /// `Note::commitment` in the Noir `obscura` library.
+    pub fn commitment(&self, market_id: u64) -> Fr {
+        hash5([
+            Fr::from(market_id),
+            self.side.to_field(),
+            Fr::from(self.amount),
+            self.secret,
+            self.nullifier_secret,
+        ])
+    }
+
+    /// Nullifier — identical to `Note::nullifier` in the Noir library.
+    pub fn nullifier(&self, market_id: u64) -> Fr {
+        hash2(self.nullifier_secret, Fr::from(market_id))
+    }
 }
 
 /// One resolved market's full set of committed notes, ready to settle.
@@ -28,6 +72,16 @@ pub struct MarketNotes {
     pub market_id: u64,
     pub escrowed_collateral: u64,
     pub notes: Vec<Note>,
+}
+
+impl MarketNotes {
+    /// Reconstructs this market's commitments-tree root from its notes. This is
+    /// the value the operator posts on-chain at settle (M1) and that the SP1
+    /// guest proves (M2).
+    pub fn merkle_root(&self) -> Fr {
+        let leaves: Vec<Fr> = self.notes.iter().map(|n| n.commitment(self.market_id)).collect();
+        merkle_root(&leaves)
+    }
 }
 
 /// The proven, public result of settling one market.
@@ -81,13 +135,74 @@ fn settle_market(market: &MarketNotes) -> Result<MarketSettlement, SettlementErr
     Ok(MarketSettlement { market_id: market.market_id, total_yes, total_no })
 }
 
+// --- Poseidon + Merkle ------------------------------------------------------
+
+/// Poseidon hash of two field elements (matches Noir `bn254::hash_2`).
+pub fn hash2(a: Fr, b: Fr) -> Fr {
+    let mut h = Poseidon::<Fr>::new_circom(2).expect("poseidon t=3 params");
+    h.hash(&[a, b]).expect("poseidon hash_2")
+}
+
+/// Poseidon hash of five field elements (matches Noir `bn254::hash_5`).
+pub fn hash5(inputs: [Fr; 5]) -> Fr {
+    let mut h = Poseidon::<Fr>::new_circom(5).expect("poseidon t=6 params");
+    h.hash(&inputs).expect("poseidon hash_5")
+}
+
+/// Precomputed roots of all-zero subtrees, one per level: `zeros[0]` is the
+/// empty-leaf value (0) and `zeros[i] = hash2(zeros[i-1], zeros[i-1])`. Used to
+/// pad a partially-filled fixed-depth tree without materialising 2^depth leaves.
+fn zero_hashes() -> [Fr; MERKLE_DEPTH + 1] {
+    let mut z = [Fr::from(0u64); MERKLE_DEPTH + 1];
+    for i in 1..=MERKLE_DEPTH {
+        z[i] = hash2(z[i - 1], z[i - 1]);
+    }
+    z
+}
+
+/// Computes the root of a fixed-depth (`MERKLE_DEPTH`) Poseidon Merkle tree
+/// whose leftmost leaves are `leaves` and whose remaining leaves are zero. Only
+/// the populated nodes are hashed (O(leaves * depth)), so it is practical even
+/// for a depth-20 tree.
+pub fn merkle_root(leaves: &[Fr]) -> Fr {
+    let zeros = zero_hashes();
+    if leaves.is_empty() {
+        return zeros[MERKLE_DEPTH];
+    }
+
+    let mut level: Vec<Fr> = leaves.to_vec();
+    for depth in 0..MERKLE_DEPTH {
+        let mut next = Vec::with_capacity(level.len().div_ceil(2));
+        let mut i = 0;
+        while i < level.len() {
+            let left = level[i];
+            let right = if i + 1 < level.len() { level[i + 1] } else { zeros[depth] };
+            next.push(hash2(left, right));
+            i += 2;
+        }
+        level = next;
+    }
+    level[0]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ark_ff::{BigInteger, PrimeField};
 
     fn note(side: Side, amount: u64) -> Note {
-        Note { side, amount }
+        Note { side, amount, secret: Fr::from(0u64), nullifier_secret: Fr::from(0u64) }
     }
+
+    fn to_hex(f: Fr) -> String {
+        let mut s = String::from("0x");
+        for b in f.into_bigint().to_bytes_be() {
+            s.push_str(&format!("{b:02x}"));
+        }
+        s
+    }
+
+    // --- settlement ---
 
     #[test]
     fn settles_a_single_solvent_market() {
@@ -175,5 +290,90 @@ mod tests {
 
         let err = settle_batch(&markets).unwrap_err();
         assert_eq!(err, SettlementError::Overflow { market_id: 0 });
+    }
+
+    // --- Poseidon compatibility with Noir (fixed vectors from fixture_gen) ---
+
+    #[test]
+    fn hash2_matches_noir() {
+        // Noir bn254::hash_2([222222, 0])
+        assert_eq!(
+            to_hex(hash2(Fr::from(222222u64), Fr::from(0u64))),
+            "0x0d7b4a7191654350afa3eec27d6216350a8a7733f27035403ab7cea34a015e35"
+        );
+    }
+
+    #[test]
+    fn hash5_matches_noir() {
+        // Noir bn254::hash_5([0, 1, 1e18, 111111, 222222])
+        assert_eq!(
+            to_hex(hash5([
+                Fr::from(0u64),
+                Fr::from(1u64),
+                Fr::from(1_000_000_000_000_000_000u64),
+                Fr::from(111111u64),
+                Fr::from(222222u64),
+            ])),
+            "0x061a4960a702e1605e3442b65b6fe17b3ea6b2ca30d7b6135fe1b00b01535252"
+        );
+    }
+
+    #[test]
+    fn note_commitment_matches_noir_fixture() {
+        // Same witness as circuits/claim/Prover.toml -> the fixture commitment.
+        let n = Note {
+            side: Side::Yes,
+            amount: 1_000_000_000_000_000_000,
+            secret: Fr::from(111111u64),
+            nullifier_secret: Fr::from(222222u64),
+        };
+        assert_eq!(
+            to_hex(n.commitment(0)),
+            "0x061a4960a702e1605e3442b65b6fe17b3ea6b2ca30d7b6135fe1b00b01535252"
+        );
+        assert_eq!(
+            to_hex(n.nullifier(0)),
+            "0x0d7b4a7191654350afa3eec27d6216350a8a7733f27035403ab7cea34a015e35"
+        );
+    }
+
+    // --- Merkle root reconstruction ---
+
+    #[test]
+    fn merkle_root_of_single_leaf_uses_zero_padding() {
+        // With one real leaf, every sibling up the tree is the zero-subtree of
+        // that level, so the root equals folding the leaf against zeros[depth].
+        let leaf = Fr::from(42u64);
+        let zeros = zero_hashes();
+        let mut expected = leaf;
+        for depth in 0..MERKLE_DEPTH {
+            expected = hash2(expected, zeros[depth]);
+        }
+        assert_eq!(merkle_root(&[leaf]), expected);
+    }
+
+    #[test]
+    fn merkle_root_is_deterministic_and_order_sensitive() {
+        let a = [Fr::from(1u64), Fr::from(2u64), Fr::from(3u64)];
+        let b = [Fr::from(2u64), Fr::from(1u64), Fr::from(3u64)];
+        assert_eq!(merkle_root(&a), merkle_root(&a));
+        assert_ne!(merkle_root(&a), merkle_root(&b));
+    }
+
+    #[test]
+    fn empty_tree_root_is_the_all_zero_subtree() {
+        let zeros = zero_hashes();
+        assert_eq!(merkle_root(&[]), zeros[MERKLE_DEPTH]);
+    }
+
+    #[test]
+    fn market_notes_reconstructs_root_from_its_notes() {
+        let m = MarketNotes {
+            market_id: 3,
+            escrowed_collateral: 300,
+            notes: vec![note(Side::Yes, 100), note(Side::No, 200)],
+        };
+        let leaves: Vec<Fr> = m.notes.iter().map(|n| n.commitment(3)).collect();
+        assert_eq!(m.merkle_root(), merkle_root(&leaves));
     }
 }
