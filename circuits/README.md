@@ -56,3 +56,20 @@ nargo compile    # compile circuits to ACIR (writes to target/, gitignored)
 `nargo test` is the primary correctness gate for this directory — every
 primitive ships with determinism and negative (`should_fail_with`) tests,
 following the pattern from the author's ZK-AfterLife circuits.
+
+## Regenerating the on-chain verifier
+
+`contracts/src/verifiers/HonkVerifier.sol` is generated from the `claim`
+circuit. Regenerate it after any change to `claim`:
+
+```bash
+./generate-verifier.sh
+```
+
+It compiles the circuit, writes an UltraHonk verification key with the
+**keccak** oracle hash (the flavor for on-chain verification), and emits the
+`HonkVerifier` contract. The generated verifier's `verify(bytes proof,
+bytes32[] publicInputs)` expects a **length-5** `publicInputs` array —
+`[merkle_root, market_id, winning_side, amount, nullifier]`. The 8-field
+pairing-point object is carried inside `proof`, not the public-inputs array
+(so the contract's constant reads 13 = 5 + 8).
