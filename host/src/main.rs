@@ -132,6 +132,15 @@ fn prove_evm(client: &impl Prover) {
     println!("-> call settleWithProof(publicValues, proofBytes) on-chain with these.");
 }
 
+/// Prints the batch-settlement program's verifying-key hash (`programVKey`).
+/// This only derives the key from the guest ELF — it does NOT prove, so it's
+/// cheap and fits any machine. Use the value for the contract's `programVKey`
+/// constructor arg (see contracts/DEPLOY.md).
+fn print_vkey(client: &impl Prover) {
+    let pk = client.setup(GUEST_ELF).expect("setup failed");
+    println!("programVKey: {}", pk.verifying_key().bytes32());
+}
+
 fn main() {
     sp1_sdk::utils::setup_logger();
     let args: Vec<String> = std::env::args().collect();
@@ -142,7 +151,9 @@ fn main() {
     }
 
     let client = ProverClient::from_env();
-    if args.iter().any(|a| a == "--evm") {
+    if args.iter().any(|a| a == "--vkey") {
+        print_vkey(&client);
+    } else if args.iter().any(|a| a == "--evm") {
         prove_evm(&client);
     } else if args.iter().any(|a| a == "--prove") {
         prove_one(&client);

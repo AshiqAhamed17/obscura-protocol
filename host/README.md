@@ -26,6 +26,9 @@ cargo run --release -p host
 
 # generate a real SP1 core proof, verify it locally, and save it
 cargo run --release -p host -- --prove
+
+# print the program verifying key (programVKey) for the contract — cheap, no proving
+cargo run --release -p host -- --vkey
 ```
 
 The guest ELF is rebuilt automatically by `build.rs` when the guest changes.
