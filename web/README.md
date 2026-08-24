@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Obscura — web app
 
-## Getting Started
+Next.js frontend for Obscura Protocol, styled with the "Dark Pool" identity.
+Talks to the live `PredictionMarket` on Sepolia.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+A browser wallet (MetaMask etc.) on **Sepolia** is required for deposits/claims.
+Reads (markets, solvency) work without a wallet.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Pages
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/` — hero + live market list (reads the deployed contract).
+- `/deposit` — take a private position: generates a note + Poseidon commitment
+  client-side, escrows ETH via `deposit()`, and shows the note to back up.
+- `/claim` — prove ownership of a winning note in-browser (Noir + bb.js) and
+  withdraw to a bound recipient.
+- `/solvency` — anyone can verify each settled market's proven totals reconcile
+  with the escrowed pool, without seeing positions.
 
-## Learn More
+## Architecture notes
 
-To learn more about Next.js, take a look at the following resources:
+- **Poseidon** (`lib/note.ts`, `lib/merkle.ts`) uses `poseidon-lite` (circom
+  params), verified byte-identical to the Noir circuit and the aggregation
+  crate — so commitments and the reconstructed Merkle root match on-chain state.
+- **Contract binding** is in `lib/contract.ts` (address + ABI). Update the
+  address if you redeploy.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Known caveats (honest)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Claim proving needs real-browser testing.** `lib/prove.ts` uses
+  `@noir-lang/noir_js` + `@aztec/bb.js` (WASM, browser-only, dynamically
+  imported). For a proof to verify on-chain, those library versions **must
+  match the toolchain that generated the deployed verifier** — nargo
+  `1.0.0-beta.25` and bb `5.1.0`. If they drift, the proof is valid locally but
+  rejected on-chain.
+- **Claiming requires a settled market.** The current live deployment has a
+  placeholder `programVKey` (`0x0`), so settlement — and therefore claiming —
+  is disabled until the contract is redeployed with the real vkey and a batch
+  proof is generated on the Succinct Prover Network. Deposits and the solvency
+  view are fully functional today.
+- Notes are stored in `localStorage` for the demo. A production build would let
+  users export/import notes; anyone with a note can claim its winnings.
