@@ -66,7 +66,16 @@ contract PredictionMarketE2ETest is Test {
         feed.updateAnswer(PRICE_YES);
         market.resolveMarket(id);
 
-        market.settle(id, ROOT, 1 ether, 1 ether);
+        // Settle via the (mock-verified) SP1 proof path: encode the proven
+        // totals + root as the proof's public values.
+        PredictionMarket.SettlementValues[] memory vals = new PredictionMarket.SettlementValues[](1);
+        vals[0] = PredictionMarket.SettlementValues({
+            marketId: uint64(id),
+            totalYes: 1 ether,
+            totalNo: 1 ether,
+            merkleRoot: ROOT
+        });
+        market.settleWithProof(abi.encode(vals), hex"01");
     }
 
     function test_e2e_validClaim_paysOut() public {

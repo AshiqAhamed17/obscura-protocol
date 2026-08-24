@@ -21,24 +21,22 @@ interface ISP1Verifier {
 /// @notice Price-threshold prediction markets resolved by a Chainlink Price
 ///         Feed. Positions are private: a deposit escrows collateral and
 ///         records only a Poseidon note *commitment* (the Yes/No side is
-///         hidden). After resolution the operator settles the market with the
-///         per-side totals and the commitments-tree root; winners then claim
+///         hidden). After resolution, anyone can settle a batch of markets by
+///         submitting an SP1 proof (`settleWithProof`) that attests the
+///         per-side totals and commitments-tree root were correctly computed
+///         from each market's notes — no trusted operator. Winners then claim
 ///         with a zk-SNARK proof, unlinkably to their deposit, and the payout
 ///         recipient is bound into the proof so a claim cannot be front-run.
 ///
-/// @dev Milestone-1 trust assumptions, made explicit and removed in Milestone 2:
-///      - The commitments-tree Merkle root and the per-side totals are supplied
-///        by the operator at `settle` time (M1: trusted). The Noir circuit's
-///        Poseidon is not byte-compatible with any standard Solidity Poseidon,
-///        so recomputing the root on-chain is impractical and would duplicate
-///        the Milestone-2 SP1 proof. The full leaf set is stored on-chain as an
-///        immutable anchor, and `settle` enforces totalYes + totalNo ==
-///        totalPool. In M2 the SP1 proof replaces this trust by proving the
-///        root and totals against the committed leaves.
+/// @dev Trust model:
+///      - Settlement totals and the commitments root are established by the SP1
+///        batch-settlement proof, not by any privileged party. The full leaf
+///        set is also stored on-chain as an immutable anchor, and settlement
+///        still enforces totalYes + totalNo == totalPool as defense in depth.
 ///      - The consistency between a note's committed `amount` and the escrowed
 ///        `msg.value` cannot be checked on-chain (the amount is inside the
-///        commitment). It is enforced off-chain by the operator in M1 and by
-///        the SP1 solvency proof (sum of note amounts == totalPool) in M2.
+///        commitment); it is enforced by the SP1 solvency proof (sum of note
+///        amounts == totalPool).
 contract PredictionMarket {
     // Ordering is load-bearing: it must match the claim circuit's `side`
     // convention (0 = No, 1 = Yes) so `uint8(winningSide)` equals the
@@ -86,7 +84,6 @@ contract PredictionMarket {
     ISP1Verifier public immutable sp1Verifier;
     /// Verifying-key hash of the batch-settlement SP1 program.
     bytes32 public immutable programVKey;
-    address public immutable operator;
 
     uint256 public marketCount;
     mapping(uint256 marketId => Market) public markets;
@@ -109,7 +106,6 @@ contract PredictionMarket {
     event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo);
     event Claimed(uint256 indexed marketId, bytes32 indexed nullifier, address indexed recipient, uint256 payout);
 
-    error NotOperator();
     error MarketNotOpen();
     error MarketNotResolvable();
     error MarketNotResolved();
@@ -125,11 +121,6 @@ contract PredictionMarket {
     error NoWinningStake();
     error TransferFailed();
 
-    modifier onlyOperator() {
-        if (msg.sender != operator) revert NotOperator();
-        _;
-    }
-
     /// @param verifier_ Address of the deployed UltraHonk claim verifier.
     /// @param sp1Verifier_ Address of the SP1 verifier (gateway).
     /// @param programVKey_ Verifying-key hash of the batch-settlement SP1 program.
@@ -137,7 +128,6 @@ contract PredictionMarket {
         verifier = IHonkVerifier(verifier_);
         sp1Verifier = ISP1Verifier(sp1Verifier_);
         programVKey = programVKey_;
-        operator = msg.sender;
     }
 
     /// @param priceFeed Chainlink AggregatorV3Interface address for the underlying asset.
@@ -199,26 +189,6 @@ contract PredictionMarket {
         m.winningSide = winningSide;
 
         emit MarketResolved(marketId, winningSide, price);
-    }
-
-    /// @notice Operator posts the commitments-tree root and per-side totals,
-    ///         unlocking claims. `totalYes + totalNo` must equal the escrowed
-    ///         `totalPool`. In Milestone 2 an SP1 proof replaces this trusted
-    ///         step by proving the root and totals against the committed leaves.
-    function settle(uint256 marketId, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo)
-        external
-        onlyOperator
-    {
-        Market storage m = markets[marketId];
-        if (m.status != Status.Resolved) revert MarketNotResolved();
-        if (totalYes + totalNo != m.totalPool) revert TotalsMismatch();
-
-        m.merkleRoot = merkleRoot;
-        m.totalYes = totalYes;
-        m.totalNo = totalNo;
-        m.status = Status.Settled;
-
-        emit MarketSettled(marketId, merkleRoot, totalYes, totalNo);
     }
 
     /// @notice Trustlessly settles a batch of resolved markets from an SP1

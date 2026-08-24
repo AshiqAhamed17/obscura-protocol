@@ -24,7 +24,6 @@ contract PredictionMarketTest is Test {
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     address carol = makeAddr("carol");
-    address stranger = makeAddr("stranger");
 
     event Deposit(uint256 indexed marketId, bytes32 indexed commitment, uint256 leafIndex, uint256 amount);
     event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo);
@@ -177,57 +176,6 @@ contract PredictionMarketTest is Test {
         market.resolveMarket(id);
     }
 
-    // --- settle ---
-
-    function test_settle_setsRootTotalsAndState() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 3 ether}(id, _c(111));
-        vm.prank(bob);
-        market.deposit{value: 1 ether}(id, _c(222));
-        _resolve(id);
-
-        vm.expectEmit(true, false, false, true);
-        emit MarketSettled(id, _c(999), 2 ether, 2 ether);
-        market.settle(id, _c(999), 2 ether, 2 ether);
-
-        (,,,, PredictionMarket.Status status,,,, bytes32 root, uint256 ty, uint256 tn) = market.markets(id);
-        assertEq(uint8(status), uint8(PredictionMarket.Status.Settled));
-        assertEq(root, _c(999));
-        assertEq(ty, 2 ether);
-        assertEq(tn, 2 ether);
-    }
-
-    function test_settle_revertsForNonOperator() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 4 ether}(id, _c(111));
-        _resolve(id);
-
-        vm.prank(stranger);
-        vm.expectRevert(PredictionMarket.NotOperator.selector);
-        market.settle(id, _c(999), 4 ether, 0);
-    }
-
-    function test_settle_revertsBeforeResolution() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 4 ether}(id, _c(111));
-
-        vm.expectRevert(PredictionMarket.MarketNotResolved.selector);
-        market.settle(id, _c(999), 4 ether, 0);
-    }
-
-    function test_settle_revertsOnTotalsMismatch() public {
-        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 4 ether}(id, _c(111));
-        _resolve(id);
-
-        vm.expectRevert(PredictionMarket.TotalsMismatch.selector);
-        market.settle(id, _c(999), 2 ether, 1 ether); // 3 != 4
-    }
-
     // --- settleWithProof (trustless, SP1-verified) ---
 
     function _resolvedMarketWithPool(uint256 poolEach) internal returns (uint256 id) {
@@ -295,7 +243,7 @@ contract PredictionMarketTest is Test {
 
     // --- claim ---
 
-    /// Deposits 4 ETH, resolves Yes, settles with a 2/2 Yes/No split.
+    /// Deposits 4 ETH, resolves Yes, settles (via SP1 proof) with a 2/2 split.
     function _settledYesMarket() internal returns (uint256 id) {
         id = _createMarket(3_000e8, block.timestamp + 1 days);
         vm.prank(alice);
@@ -303,7 +251,9 @@ contract PredictionMarketTest is Test {
         vm.prank(bob);
         market.deposit{value: 2 ether}(id, _c(222));
         _resolve(id); // price == threshold -> Yes wins
-        market.settle(id, _c(999), 2 ether, 2 ether);
+        // Trustless settlement: mock SP1 verifier accepts, contract decodes the
+        // proven totals + root from the (Solidity-encoded here) public values.
+        market.settleWithProof(_encodeSettlement(uint64(id), 2 ether, 2 ether, _c(999)), hex"01");
     }
 
     function test_claim_paysProportionalPariMutuel() public {
@@ -347,12 +297,12 @@ contract PredictionMarketTest is Test {
     }
 
     function test_claim_revertsWhenNoWinningStake() public {
-        // Market resolves Yes but the operator reports zero Yes stake.
+        // Market resolves Yes but the proven totals have zero Yes stake.
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
         vm.prank(alice);
         market.deposit{value: 4 ether}(id, _c(111));
         _resolve(id); // Yes wins
-        market.settle(id, _c(999), 0, 4 ether); // totalYes = 0
+        market.settleWithProof(_encodeSettlement(uint64(id), 0, 4 ether, _c(999)), hex"01");
 
         vm.expectRevert(PredictionMarket.NoWinningStake.selector);
         market.claim(id, 1 ether, _c(555), carol, hex"01");
