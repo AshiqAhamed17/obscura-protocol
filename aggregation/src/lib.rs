@@ -115,6 +115,11 @@ pub struct MarketSettlement {
     pub market_id: u64,
     pub total_yes: u64,
     pub total_no: u64,
+    /// Commitments-tree root reconstructed from this market's notes (32
+    /// big-endian bytes). The on-chain contract checks this against the
+    /// market's stored root, so a valid proof attests that these totals were
+    /// derived from exactly the notes committed to that root.
+    pub merkle_root: FieldBytes,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,7 +162,15 @@ fn settle_market(market: &MarketNotes) -> Result<MarketSettlement, SettlementErr
         return Err(SettlementError::Insolvent { market_id: market.market_id });
     }
 
-    Ok(MarketSettlement { market_id: market.market_id, total_yes, total_no })
+    // Reconstruct the commitments-tree root from this market's notes and tie it
+    // to the totals: a valid proof means these totals came from exactly the
+    // notes under this root.
+    Ok(MarketSettlement {
+        market_id: market.market_id,
+        total_yes,
+        total_no,
+        merkle_root: market.merkle_root_bytes(),
+    })
 }
 
 // --- Poseidon + Merkle ------------------------------------------------------
@@ -246,10 +259,11 @@ mod tests {
 
         let result = settle_batch(&markets).unwrap();
 
-        assert_eq!(
-            result,
-            vec![MarketSettlement { market_id: 0, total_yes: 150, total_no: 150 }]
-        );
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].market_id, 0);
+        assert_eq!(result[0].total_yes, 150);
+        assert_eq!(result[0].total_no, 150);
+        assert_eq!(result[0].merkle_root, markets[0].merkle_root_bytes());
     }
 
     #[test]
@@ -271,9 +285,13 @@ mod tests {
         let result = settle_batch(&markets).unwrap();
 
         assert_eq!(result.len(), 3);
-        assert_eq!(result[0], MarketSettlement { market_id: 0, total_yes: 100, total_no: 0 });
-        assert_eq!(result[1], MarketSettlement { market_id: 1, total_yes: 300, total_no: 200 });
-        assert_eq!(result[2], MarketSettlement { market_id: 2, total_yes: 0, total_no: 0 });
+        for (i, r) in result.iter().enumerate() {
+            assert_eq!(r.market_id, markets[i].market_id);
+            assert_eq!(r.merkle_root, markets[i].merkle_root_bytes());
+        }
+        assert_eq!((result[0].total_yes, result[0].total_no), (100, 0));
+        assert_eq!((result[1].total_yes, result[1].total_no), (300, 200));
+        assert_eq!((result[2].total_yes, result[2].total_no), (0, 0));
     }
 
     #[test]
