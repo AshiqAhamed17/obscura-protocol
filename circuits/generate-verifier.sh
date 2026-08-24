@@ -24,7 +24,7 @@ mkdir -p ../contracts/src/verifiers
 bb write_solidity_verifier --scheme ultra_honk -k ./target/vk -o "$OUT"
 
 echo "==> done. Verifier contract: HonkVerifier (IVerifier.verify(bytes,bytes32[]))"
-echo "    Public inputs passed by caller: 5"
-echo "    (merkle_root, market_id, winning_side, amount, nullifier)"
+echo "    Public inputs passed by caller: 6"
+echo "    (merkle_root, market_id, winning_side, amount, nullifier, recipient)"
 echo "    The 8-field pairing-point object is carried inside the proof, not"
-echo "    the publicInputs array."
+echo "    the publicInputs array (so the contract constant reads 14 = 6 + 8)."

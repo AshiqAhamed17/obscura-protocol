@@ -69,7 +69,7 @@ circuit. Regenerate it after any change to `claim`:
 It compiles the circuit, writes an UltraHonk verification key with the
 **keccak** oracle hash (the flavor for on-chain verification), and emits the
 `HonkVerifier` contract. The generated verifier's `verify(bytes proof,
-bytes32[] publicInputs)` expects a **length-5** `publicInputs` array —
-`[merkle_root, market_id, winning_side, amount, nullifier]`. The 8-field
-pairing-point object is carried inside `proof`, not the public-inputs array
-(so the contract's constant reads 13 = 5 + 8).
+bytes32[] publicInputs)` expects a **length-6** `publicInputs` array —
+`[merkle_root, market_id, winning_side, amount, nullifier, recipient]`. The
+8-field pairing-point object is carried inside `proof`, not the public-inputs
+array (so the contract's constant reads 14 = 6 + 8).
