@@ -1,4 +1,5 @@
 import { Hero } from "@/components/Hero";
+import { DarkPoolMount } from "@/components/three/DarkPoolMount";
 import { Reveal } from "@/components/Reveal";
 import { Ruler } from "@/components/landing/Ruler";
 import { Features } from "@/components/landing/Features";
@@ -9,6 +10,7 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 export default function Home() {
   return (
     <main id="top">
+      <DarkPoolMount />
       <Hero />
 
       {/* headline */}

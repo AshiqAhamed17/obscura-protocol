@@ -909,6 +909,84 @@ footer {
   padding-block: clamp(3.5rem, 9vw, 7rem);
 }
 
+/* ---------- 3D dark-pool hero ---------- */
+.darkpool {
+  position: fixed !important;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.hero3d {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--pad);
+}
+.hero3d-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hero3d-wordmark {
+  background: linear-gradient(180deg, #ffffff 0%, #cdd2df 60%, #aeb4c4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 40px rgba(var(--cool), 0.35));
+}
+.hero3d-tag {
+  margin: 1.6rem 0 0;
+  max-width: 42ch;
+  color: var(--fg-2);
+  font-size: clamp(1rem, 2.2vw, 1.25rem);
+}
+.hero3d-tag em {
+  font-style: normal;
+  color: var(--fg);
+}
+.hero3d-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem var(--pad);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--fg-3);
+  flex-wrap: wrap;
+}
+.hero3d-foot b {
+  color: var(--fg-2);
+  font-weight: 500;
+}
+.scrollcue {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: cuePulse 2.4s ease-in-out infinite;
+}
+@keyframes cuePulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* content sections sit above the fixed canvas on solid black once scrolled */
+.headline,
+.band {
+  background: transparent;
+}
+
 /* headline + scroll cue */
 .headline .scrolldown {
   width: 74px;
