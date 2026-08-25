@@ -3,6 +3,7 @@
 import { useReadContract } from "wagmi";
 import { abi, PREDICTION_MARKET, type Market } from "@/lib/contract";
 import { eth, sideLabel, statusClass, statusLabel, usd } from "@/lib/format";
+import { AmbientField } from "@/components/AmbientField";
 
 export default function SolvencyPage() {
   const { data: count, isLoading } = useReadContract({
@@ -13,7 +14,10 @@ export default function SolvencyPage() {
   const n = Number(count ?? 0n);
 
   return (
-    <main className="wrap page">
+    <>
+      <AmbientField />
+      <main className="wrap page">
+      <p className="eyebrow">Audit</p>
       <h1>Solvency</h1>
       <p className="lead">
         Every settled market&apos;s totals were established by an SP1 proof, not by an operator —
@@ -28,7 +32,8 @@ export default function SolvencyPage() {
           <SolvencyCard key={i} id={BigInt(i)} />
         ))}
       </div>
-    </main>
+      </main>
+    </>
   );
 }
 

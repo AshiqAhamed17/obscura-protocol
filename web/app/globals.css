@@ -909,6 +909,14 @@ footer {
   padding-block: clamp(3.5rem, 9vw, 7rem);
 }
 
+/* ambient backdrop for app pages */
+.ambient-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* ---------- 3D dark-pool hero ---------- */
 .darkpool {
   position: fixed !important;

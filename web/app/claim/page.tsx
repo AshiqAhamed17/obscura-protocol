@@ -6,6 +6,7 @@ import { abi, PREDICTION_MARKET, type Market } from "@/lib/contract";
 import { commitment, loadNotes, nullifier, storedToNote, type Note } from "@/lib/note";
 import { generateClaimProof } from "@/lib/prove";
 import { eth, sideLabel, statusLabel, usd } from "@/lib/format";
+import { AmbientField } from "@/components/AmbientField";
 
 export default function ClaimPage() {
   const { address, isConnected } = useAccount();
@@ -17,7 +18,10 @@ export default function ClaimPage() {
   }, []);
 
   return (
-    <main className="wrap page">
+    <>
+      <AmbientField />
+      <main className="wrap page">
+      <p className="eyebrow">Withdraw</p>
       <h1>Claim your winnings</h1>
       <p className="lead">
         Prove you hold a winning note without revealing which deposit it is. The proof is generated
@@ -81,7 +85,8 @@ export default function ClaimPage() {
           </aside>
         </div>
       )}
-    </main>
+      </main>
+    </>
   );
 }
 

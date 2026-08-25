@@ -8,20 +8,24 @@ import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteCont
 import { abi, PREDICTION_MARKET, Side, type Market } from "@/lib/contract";
 import { commitment, newNote, saveNote, type Note } from "@/lib/note";
 import { usd, statusLabel } from "@/lib/format";
+import { AmbientField } from "@/components/AmbientField";
 
 export default function DepositPage() {
   return (
-    <main className="wrap page">
-      <p className="eyebrow">Deposit</p>
+    <>
+      <AmbientField />
+      <main className="wrap page">
+        <p className="eyebrow">Deposit</p>
       <h1>Take a private position</h1>
       <p className="lead">
         Your side stays hidden — only a Poseidon commitment to your bet goes on-chain, and the ETH
         is escrowed. Save the note shown after depositing; you need it to claim.
       </p>
-      <Suspense fallback={<p className="muted mono">Loading…</p>}>
-        <DepositForm />
-      </Suspense>
-    </main>
+        <Suspense fallback={<p className="muted mono">Loading…</p>}>
+          <DepositForm />
+        </Suspense>
+      </main>
+    </>
   );
 }
 
