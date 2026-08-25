@@ -914,7 +914,11 @@ footer {
   position: fixed !important;
   inset: 0;
   z-index: 0;
-  pointer-events: none;
+}
+/* the WebGL canvas must never intercept clicks (it paints over content) */
+.darkpool,
+.darkpool canvas {
+  pointer-events: none !important;
 }
 .hero3d {
   position: relative;
@@ -931,6 +935,15 @@ footer {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+/* brighter, legible over the particle sphere */
+.hero3d .hero-eyebrow {
+  color: #d3d8e4;
+  font-weight: 500;
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.9);
+}
+.hero3d-tag {
+  text-shadow: 0 1px 20px rgba(0, 0, 0, 0.9);
 }
 .hero3d-wordmark {
   background: linear-gradient(180deg, #ffffff 0%, #cdd2df 60%, #aeb4c4 100%);
