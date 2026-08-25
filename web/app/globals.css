@@ -531,6 +531,66 @@ main,
   color: var(--no);
 }
 
+/* price gauge (live Chainlink price vs threshold) */
+.gauge {
+  margin-top: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.gauge-head,
+.gauge-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+.gauge-head span:first-child {
+  color: var(--fg-3);
+}
+.gauge-track {
+  position: relative;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(255, 159, 174, 0.25), rgba(255, 255, 255, 0.12) 50%, rgba(143, 230, 203, 0.25));
+}
+.gauge-threshold {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--fg-2);
+  transform: translateX(-50%);
+}
+.gauge-threshold::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fg-2);
+  transform: translateX(-50%);
+}
+.gauge-marker {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.gauge-marker.yes {
+  background: var(--yes);
+  box-shadow: 0 0 12px var(--yes);
+}
+.gauge-marker.no {
+  background: var(--no);
+  box-shadow: 0 0 12px var(--no);
+}
+
 /* how-it-works step cards */
 .step-n {
   font-family: var(--serif);

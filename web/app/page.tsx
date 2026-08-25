@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Reveal } from "@/components/Reveal";
+import { Hero } from "@/components/Hero";
 
 const STEPS = [
   {
@@ -23,24 +24,7 @@ export default function Home() {
   return (
     <main>
       {/* Hero — the dark pool */}
-      <div className="stage">
-        <section className="hero">
-          <div className="hero-surface" aria-hidden />
-          <div className="hero-body">
-            <p className="hero-eyebrow">Privacy-preserving prediction markets</p>
-            <h1 className="wordmark">OBSCURA</h1>
-          </div>
-          <div className="hero-foot">
-            <span>
-              Built with <b>Noir</b> · <b>SP1</b> · <b>Chainlink</b>
-            </span>
-            <span className="live">
-              <span className="beat" aria-hidden />
-              Live on Sepolia
-            </span>
-          </div>
-        </section>
-      </div>
+      <Hero />
 
       {/* Headline */}
       <div className="wrap headline">

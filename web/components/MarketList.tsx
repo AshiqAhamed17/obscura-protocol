@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { motion } from "framer-motion";
 import { useReadContract, useWaitForTransactionReceipt, useWriteContract, useAccount } from "wagmi";
 import { abi, PREDICTION_MARKET, type Market } from "@/lib/contract";
 import { statusLabel, statusClass, sideLabel, usd, eth, whenResolves } from "@/lib/format";
+import { PriceGauge } from "./PriceGauge";
 
 export function MarketList() {
   const { data: count, isLoading } = useReadContract({
@@ -20,13 +22,13 @@ export function MarketList() {
   return (
     <div className="grid">
       {Array.from({ length: n }, (_, i) => (
-        <MarketCard key={i} id={BigInt(i)} />
+        <MarketCard key={i} id={BigInt(i)} index={i} />
       ))}
     </div>
   );
 }
 
-function MarketCard({ id }: { id: bigint }) {
+function MarketCard({ id, index }: { id: bigint; index: number }) {
   const { isConnected } = useAccount();
   const { data, refetch } = useReadContract({
     abi,
@@ -51,13 +53,20 @@ function MarketCard({ id }: { id: bigint }) {
   }
 
   const m = data as unknown as Market;
-  const [, threshold, resolveAfter, , status, winningSide, totalPool] = m;
+  const [feed, threshold, resolveAfter, , status, winningSide, totalPool] = m;
   const now = BigInt(Math.floor(Date.now() / 1000));
   const isOpen = status === 0;
   const resolvable = isOpen && now >= resolveAfter;
 
   return (
-    <div className="card">
+    <motion.article
+      className="card"
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.55, ease: [0.2, 0.7, 0.2, 1], delay: index * 0.07 }}
+      whileHover={{ y: -4 }}
+    >
       <span className={`pill ${statusClass(status)}`}>{statusLabel(status)}</span>
       <span className="card-id">MARKET #{id.toString()}</span>
       <h3>ETH ≥ {usd(threshold)}</h3>
@@ -79,6 +88,8 @@ function MarketCard({ id }: { id: bigint }) {
           </div>
         )}
       </div>
+
+      <PriceGauge feed={feed} threshold={threshold} />
 
       <div className="actions">
         {isOpen && (
@@ -121,6 +132,6 @@ function MarketCard({ id }: { id: bigint }) {
           </a>
         </p>
       )}
-    </div>
+    </motion.article>
   );
 }

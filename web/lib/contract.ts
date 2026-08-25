@@ -22,6 +22,12 @@ export enum Status {
   Settled = 2,
 }
 
+/// Minimal Chainlink AggregatorV3 read interface (for the live price gauge).
+export const aggregatorAbi = parseAbi([
+  "function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
+  "function decimals() view returns (uint8)",
+]);
+
 export const abi = parseAbi([
   "function marketCount() view returns (uint256)",
   "function markets(uint256) view returns (address priceFeed, int256 threshold, uint256 resolveAfter, uint256 maxPriceStaleness, uint8 status, uint8 winningSide, uint256 totalPool, uint256 depositCount, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo)",

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "./ConnectButton";
 
 const LINKS = [
-  { href: "/", label: "Markets" },
+  { href: "/markets", label: "Markets" },
   { href: "/deposit", label: "Deposit" },
   { href: "/claim", label: "Claim" },
   { href: "/solvency", label: "Solvency" },
