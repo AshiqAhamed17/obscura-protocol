@@ -1,6 +1,23 @@
 import Link from "next/link";
-import { MarketList } from "@/components/MarketList";
 import { Reveal } from "@/components/Reveal";
+
+const STEPS = [
+  {
+    n: "01",
+    title: "Deposit privately",
+    body: "Your bet becomes a Poseidon commitment. Only the fingerprint goes on-chain — your Yes/No side stays hidden.",
+  },
+  {
+    n: "02",
+    title: "Resolve on Chainlink",
+    body: "After the deadline the market reads a Chainlink price feed and records the winning side. No admin verdict.",
+  },
+  {
+    n: "03",
+    title: "Settle by proof",
+    body: "An SP1 zkVM proves the whole book's totals are correct and solvent — then winners claim, unlinkably.",
+  },
+];
 
 export default function Home() {
   return (
@@ -40,8 +57,8 @@ export default function Home() {
             </p>
           </Reveal>
           <Reveal delay={160} className="cta-row">
-            <Link className="btn primary" href="/deposit">
-              Take a position
+            <Link className="btn primary" href="/markets">
+              View markets
             </Link>
             <Link className="btn" href="/solvency">
               Verify solvency
@@ -50,18 +67,33 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Markets */}
+      {/* How it works */}
       <section className="section">
         <div className="wrap">
           <Reveal>
-            <p className="eyebrow">On Sepolia</p>
-            <h2>Markets</h2>
+            <p className="eyebrow">How it works</p>
+            <h2>Three steps, deposit to payout.</h2>
             <p className="desc">
-              Deposits are shielded. Markets resolve against a Chainlink price feed and settle with
-              an SP1 proof — the totals are verified, never trusted.
+              Two proofs do the work: one keeps your position private, the other keeps the pool
+              honest.
             </p>
           </Reveal>
-          <MarketList />
+          <div className="grid">
+            {STEPS.map((s, i) => (
+              <Reveal key={s.n} delay={i * 80}>
+                <article className="card">
+                  <span className="step-n">{s.n}</span>
+                  <h3 style={{ marginTop: "auto" }}>{s.title}</h3>
+                  <p className="step-body">{s.body}</p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+          <Reveal delay={120} className="cta-row" >
+            <Link className="btn primary" href="/markets" style={{ marginTop: "1.6rem" }}>
+              Take a position
+            </Link>
+          </Reveal>
         </div>
       </section>
 

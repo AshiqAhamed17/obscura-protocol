@@ -12,16 +12,15 @@ import { usd, statusLabel } from "@/lib/format";
 export default function DepositPage() {
   return (
     <main className="wrap page">
+      <p className="eyebrow">Deposit</p>
       <h1>Take a private position</h1>
       <p className="lead">
         Your side stays hidden — only a Poseidon commitment to your bet goes on-chain, and the ETH
         is escrowed. Save the note shown after depositing; you need it to claim.
       </p>
-      <div className="panel">
-        <Suspense fallback={<p className="muted mono">Loading…</p>}>
-          <DepositForm />
-        </Suspense>
-      </div>
+      <Suspense fallback={<p className="muted mono">Loading…</p>}>
+        <DepositForm />
+      </Suspense>
     </main>
   );
 }
@@ -55,7 +54,6 @@ function DepositForm() {
     }
   }, [marketId, side, amount]);
 
-  // Persist the note once the deposit confirms.
   useEffect(() => {
     if (isSuccess && pendingNote && !savedNote) {
       saveNote(pendingNote);
@@ -67,6 +65,7 @@ function DepositForm() {
   const marketCount = Number(count ?? 0n);
   const status = market ? Number(market[4]) : undefined;
   const isOpen = status === 0;
+  const commit = pendingNote ? commitment(pendingNote) : null;
 
   function submit() {
     if (!pendingNote) return;
@@ -84,59 +83,96 @@ function DepositForm() {
   if (savedNote) return <NoteBackup note={savedNote} hash={hash} />;
 
   return (
-    <div className="form">
-      <div className="field">
-        <label>Market</label>
-        <select value={marketId} onChange={(e) => setMarketId(e.target.value)}>
-          {Array.from({ length: Math.max(marketCount, 1) }, (_, i) => (
-            <option key={i} value={i}>
-              Market #{i}
-            </option>
-          ))}
-        </select>
-        {market && (
-          <span className="muted mono" style={{ fontSize: "0.8rem" }}>
-            ETH ≥ {usd(market[1])} · {statusLabel(status!)}
-          </span>
-        )}
-      </div>
+    <div className="split">
+      {/* left — the form */}
+      <div className="panel">
+        <div className="form">
+          <div className="field">
+            <label>Market</label>
+            <select value={marketId} onChange={(e) => setMarketId(e.target.value)}>
+              {Array.from({ length: Math.max(marketCount, 1) }, (_, i) => (
+                <option key={i} value={i}>
+                  Market #{i}
+                </option>
+              ))}
+            </select>
+            {market && (
+              <span className="hint">
+                ETH ≥ {usd(market[1])} · {statusLabel(status!)}
+              </span>
+            )}
+          </div>
 
-      <div className="field">
-        <label>Your side</label>
-        <div className="side-toggle">
-          <button
-            type="button"
-            className={side === Side.Yes ? "sel-yes" : ""}
-            onClick={() => setSide(Side.Yes)}
-          >
-            Yes
-          </button>
-          <button
-            type="button"
-            className={side === Side.No ? "sel-no" : ""}
-            onClick={() => setSide(Side.No)}
-          >
-            No
+          <div className="field">
+            <label>Your side</label>
+            <div className="side-toggle">
+              <button type="button" className={side === Side.Yes ? "sel-yes" : ""} onClick={() => setSide(Side.Yes)}>
+                Yes
+              </button>
+              <button type="button" className={side === Side.No ? "sel-no" : ""} onClick={() => setSide(Side.No)}>
+                No
+              </button>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Amount (ETH)</label>
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+          </div>
+
+          {!isConnected && <div className="note">Connect your wallet to deposit.</div>}
+          {market && !isOpen && <div className="note err">This market is closed for deposits.</div>}
+          {error && <div className="note err">{(error as { shortMessage?: string }).shortMessage ?? error.message}</div>}
+
+          <button className="btn primary" onClick={submit} disabled={!isConnected || !isOpen || !pendingNote || isPending || confirming}>
+            {isPending ? "Confirm in wallet…" : confirming ? "Depositing…" : "Deposit privately"}
           </button>
         </div>
       </div>
 
-      <div className="field">
-        <label>Amount (ETH)</label>
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
-      </div>
+      {/* right — what goes on-chain */}
+      <aside className="aside">
+        <div>
+          <p className="aside-eyebrow">Your position, sealed</p>
+          <h3>What actually goes on-chain</h3>
+        </div>
 
-      {!isConnected && <div className="note">Connect your wallet to deposit.</div>}
-      {market && !isOpen && <div className="note err">This market is not open for deposits.</div>}
-      {error && <div className="note err">{(error as { shortMessage?: string }).shortMessage ?? error.message}</div>}
+        <div className="seal">
+          <div>
+            <span className="k">commitment </span>
+            <span className="commit">{commit ? `${commit.slice(0, 16)}…${commit.slice(-6)}` : "—"}</span>
+          </div>
+          <div style={{ marginTop: "0.5rem" }}>
+            <span className="k">side </span>
+            <span className="veiled">██ hidden</span>
+          </div>
+          <div style={{ marginTop: "0.5rem" }}>
+            <span className="k">amount </span>
+            {amount || "0"} ETH
+          </div>
+        </div>
 
-      <button
-        className="btn primary"
-        onClick={submit}
-        disabled={!isConnected || !isOpen || !pendingNote || isPending || confirming}
-      >
-        {isPending ? "Confirm in wallet…" : confirming ? "Depositing…" : "Deposit privately"}
-      </button>
+        <div className="steps">
+          <div className="step">
+            <span className="dot">1</span>
+            <p>
+              Your <b>Yes/No side is hashed</b> into the commitment — the chain only sees the fingerprint above.
+            </p>
+          </div>
+          <div className="step">
+            <span className="dot">2</span>
+            <p>
+              Your ETH is <b>escrowed</b> by the contract until the market settles.
+            </p>
+          </div>
+          <div className="step">
+            <span className="dot">3</span>
+            <p>
+              Later you <b>claim with a private proof</b> — unlinkable to this deposit. Keep the note safe.
+            </p>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -154,37 +190,34 @@ function NoteBackup({ note, hash }: { note: Note; hash?: `0x${string}` }) {
     2,
   );
   return (
-    <div className="form">
-      <div className="note ok">
-        Deposit confirmed. Your position is shielded on-chain.
-        {hash && (
-          <>
-            {" "}
-            <a
-              href={`https://sepolia.etherscan.io/tx/${hash}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ textDecoration: "underline" }}
-            >
-              View tx ↗
-            </a>
-          </>
-        )}
-      </div>
-      <div className="field">
-        <label>Back up this note — you need it to claim</label>
-        <textarea readOnly value={backup} rows={7} />
-        <span className="muted" style={{ fontSize: "0.8rem" }}>
-          It&apos;s also saved in this browser. Anyone with this note can claim the winnings — keep it safe.
-        </span>
-      </div>
-      <div style={{ display: "flex", gap: "0.6rem" }}>
-        <button className="btn" onClick={() => navigator.clipboard.writeText(backup)}>
-          Copy note
-        </button>
-        <Link className="btn" href="/">
-          Back to markets
-        </Link>
+    <div className="panel" style={{ maxWidth: 620 }}>
+      <div className="form">
+        <div className="note ok">
+          Deposit confirmed — your position is shielded on-chain.
+          {hash && (
+            <>
+              {" "}
+              <a href={`https://sepolia.etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer">
+                View tx ↗
+              </a>
+            </>
+          )}
+        </div>
+        <div className="field">
+          <label>Back up this note — you need it to claim</label>
+          <textarea readOnly value={backup} rows={7} />
+          <span className="hint">
+            Also saved in this browser. Anyone with this note can claim the winnings — keep it safe.
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+          <button className="btn" onClick={() => navigator.clipboard.writeText(backup)}>
+            Copy note
+          </button>
+          <Link className="btn" href="/markets">
+            Back to markets
+          </Link>
+        </div>
       </div>
     </div>
   );

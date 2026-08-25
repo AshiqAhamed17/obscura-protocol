@@ -33,20 +33,52 @@ export default function ClaimPage() {
       )}
 
       {isConnected && notes.length > 0 && (
-        <div className="panel">
-          <div className="form">
-            <div className="field">
-              <label>Your notes</label>
-              <select value={selected} onChange={(e) => setSelected(Number(e.target.value))}>
-                {notes.map((n, i) => (
-                  <option key={i} value={i}>
-                    Market #{n.marketId.toString()} · {sideLabel(n.side)} · {eth(n.amount)}
-                  </option>
-                ))}
-              </select>
+        <div className="split">
+          <div className="panel">
+            <div className="form">
+              <div className="field">
+                <label>Your notes</label>
+                <select value={selected} onChange={(e) => setSelected(Number(e.target.value))}>
+                  {notes.map((n, i) => (
+                    <option key={i} value={i}>
+                      Market #{n.marketId.toString()} · {sideLabel(n.side)} · {eth(n.amount)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ClaimForm note={notes[selected]} recipient={address as `0x${string}`} />
             </div>
-            <ClaimForm note={notes[selected]} recipient={address as `0x${string}`} />
           </div>
+
+          <aside className="aside">
+            <div>
+              <p className="aside-eyebrow">Zero-knowledge withdrawal</p>
+              <h3>How your claim stays private</h3>
+            </div>
+            <div className="steps">
+              <div className="step">
+                <span className="dot">1</span>
+                <p>
+                  A <b>Noir proof</b> shows you own an unspent, winning note — without revealing which
+                  deposit it is.
+                </p>
+              </div>
+              <div className="step">
+                <span className="dot">2</span>
+                <p>
+                  A one-time <b>nullifier</b> is burned, so the same note can never be claimed twice.
+                </p>
+              </div>
+              <div className="step">
+                <span className="dot">3</span>
+                <p>
+                  The <b>recipient is bound into the proof</b> — no one can copy it from the mempool and
+                  redirect your payout.
+                </p>
+              </div>
+            </div>
+            <p className="hint">Proving runs in your browser and can take tens of seconds.</p>
+          </aside>
         </div>
       )}
     </main>
