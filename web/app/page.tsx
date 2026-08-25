@@ -1,92 +1,63 @@
-import Link from "next/link";
-import { Reveal } from "@/components/Reveal";
 import { Hero } from "@/components/Hero";
-
-const STEPS = [
-  {
-    n: "01",
-    title: "Deposit privately",
-    body: "Your bet becomes a Poseidon commitment. Only the fingerprint goes on-chain — your Yes/No side stays hidden.",
-  },
-  {
-    n: "02",
-    title: "Resolve on Chainlink",
-    body: "After the deadline the market reads a Chainlink price feed and records the winning side. No admin verdict.",
-  },
-  {
-    n: "03",
-    title: "Settle by proof",
-    body: "An SP1 zkVM proves the whole book's totals are correct and solvent — then winners claim, unlinkably.",
-  },
-];
+import { Reveal } from "@/components/Reveal";
+import { Ruler } from "@/components/landing/Ruler";
+import { Features } from "@/components/landing/Features";
+import { WorkSection } from "@/components/landing/WorkSection";
+import { ProofSection } from "@/components/landing/ProofSection";
+import { LandingFooter } from "@/components/landing/LandingFooter";
 
 export default function Home() {
   return (
-    <main>
-      {/* Hero — the dark pool */}
+    <main id="top">
       <Hero />
 
-      {/* Headline */}
+      {/* headline */}
       <div className="wrap headline">
         <div>
           <Reveal>
             <h1>
-              Private to place. <em>Proven</em> to pay.
+              A prediction market that&apos;s <em>private</em> to place and <em>proven</em> to pay.
             </h1>
           </Reveal>
           <Reveal delay={90}>
             <p className="sub">
-              Take a position without revealing your side. The whole book settles under a
-              zero-knowledge proof — so nobody sees your bet, and nobody has to trust the house.
+              Your position is shielded the moment you take it. The whole book is settled by a
+              zero-knowledge proof — so nobody sees your side, and nobody has to trust the house.
             </p>
           </Reveal>
-          <Reveal delay={160} className="cta-row">
-            <Link className="btn primary" href="/markets">
-              View markets
-            </Link>
-            <Link className="btn" href="/solvency">
-              Verify solvency
-            </Link>
-          </Reveal>
         </div>
+        <a className="scrolldown" href="#features" aria-label="Scroll to features">
+          <svg width="18" height="24" viewBox="0 0 18 24" fill="none">
+            <path d="M9 1v20M2 15l7 7 7-7" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+        </a>
       </div>
 
-      {/* How it works */}
-      <section className="section">
-        <div className="wrap">
-          <Reveal>
-            <p className="eyebrow">How it works</p>
-            <h2>Three steps, deposit to payout.</h2>
-            <p className="desc">
-              Two proofs do the work: one keeps your position private, the other keeps the pool
-              honest.
-            </p>
-          </Reveal>
-          <div className="grid">
-            {STEPS.map((s, i) => (
-              <Reveal key={s.n} delay={i * 80}>
-                <article className="card">
-                  <span className="step-n">{s.n}</span>
-                  <h3 style={{ marginTop: "auto" }}>{s.title}</h3>
-                  <p className="step-body">{s.body}</p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-          <Reveal delay={120} className="cta-row" >
-            <Link className="btn primary" href="/markets" style={{ marginTop: "1.6rem" }}>
-              Take a position
-            </Link>
-          </Reveal>
+      <Ruler />
+      <Features />
+      <Ruler />
+      <WorkSection />
+      <Ruler />
+      <ProofSection />
+
+      {/* closer */}
+      <section className="band wrap">
+        <div className="kicker">Obscura Protocol</div>
+        <div className="landing-h2" style={{ fontSize: "clamp(2.2rem, 6vw, 4.4rem)", maxWidth: "16ch" }}>
+          Private to place. <em>Proven</em> to pay.
         </div>
+        <a
+          className="doclink"
+          href="https://github.com/AshiqAhamed17/obscura-protocol"
+          target="_blank"
+          rel="noreferrer"
+          style={{ marginTop: "1.4rem" }}
+        >
+          Explore the repository ↗
+        </a>
       </section>
 
-      <footer>
-        <div className="wrap foot">
-          <span>© 2026 Obscura Protocol · Sepolia testnet</span>
-          <span>Noir · SP1 · Chainlink · Solidity</span>
-        </div>
-      </footer>
+      <LandingFooter />
     </main>
   );
 }
