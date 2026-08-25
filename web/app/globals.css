@@ -256,6 +256,12 @@ main,
     transform: scaleX(1);
   }
 }
+.pool-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
 .hero-body {
   position: relative;
   z-index: 2;
@@ -432,13 +438,40 @@ main,
   inset: -40% -30% auto auto;
   width: 65%;
   height: 75%;
-  background: radial-gradient(circle, rgba(var(--cool), 0.1), transparent 70%);
+  background: radial-gradient(circle, rgba(var(--cool), 0.12), transparent 70%);
   opacity: 0;
   transition: opacity 0.35s ease;
   pointer-events: none;
+  z-index: 0;
 }
 .card:hover::before {
   opacity: 1;
+}
+/* faint drifting grid texture */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 30px 30px;
+  opacity: 0.18;
+  mask-image: radial-gradient(130% 90% at 85% 0%, black, transparent 72%);
+  animation: gridDrift 16s linear infinite;
+}
+@keyframes gridDrift {
+  to {
+    background-position: 30px 30px;
+  }
+}
+.card > * {
+  position: relative;
+  z-index: 1;
+}
+.tilt {
+  will-change: transform;
 }
 .card .card-id {
   font-family: var(--mono);

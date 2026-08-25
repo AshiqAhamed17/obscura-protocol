@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { PoolCanvas } from "./PoolCanvas";
 
 const ease = [0.2, 0.7, 0.2, 1] as const;
 
@@ -8,7 +9,7 @@ export function Hero() {
   return (
     <div className="stage">
       <section className="hero">
-        <div className="hero-surface" aria-hidden />
+        <PoolCanvas />
         <div className="hero-body">
           <motion.p
             className="hero-eyebrow"

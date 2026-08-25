@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useReadContract, useWaitForTransactionReceipt, useWriteContract, useAccount } from "wagmi";
 import { abi, PREDICTION_MARKET, type Market } from "@/lib/contract";
 import { statusLabel, statusClass, sideLabel, usd, eth, whenResolves } from "@/lib/format";
@@ -30,6 +30,22 @@ export function MarketList() {
 
 function MarketCard({ id, index }: { id: bigint; index: number }) {
   const { isConnected } = useAccount();
+
+  // pointer-driven 3D tilt
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [7, -7]), { stiffness: 200, damping: 18 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-7, 7]), { stiffness: 200, damping: 18 });
+  const onMove = (e: React.MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    px.set((e.clientX - r.left) / r.width - 0.5);
+    py.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const onLeave = () => {
+    px.set(0);
+    py.set(0);
+  };
+
   const { data, refetch } = useReadContract({
     abi,
     address: PREDICTION_MARKET,
@@ -60,12 +76,15 @@ function MarketCard({ id, index }: { id: bigint; index: number }) {
 
   return (
     <motion.article
-      className="card"
+      className="card tilt"
       initial={{ opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.55, ease: [0.2, 0.7, 0.2, 1], delay: index * 0.07 }}
       whileHover={{ y: -4 }}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{ rotateX, rotateY, transformPerspective: 900 }}
     >
       <span className={`pill ${statusClass(status)}`}>{statusLabel(status)}</span>
       <span className="card-id">MARKET #{id.toString()}</span>
