@@ -918,10 +918,12 @@ footer {
 }
 
 /* ---------- 3D dark-pool hero ---------- */
-.darkpool {
-  position: fixed !important;
+.darkpool-wrap {
+  position: fixed;
   inset: 0;
   z-index: 0;
+  pointer-events: none;
+  transition: opacity 0.12s linear;
 }
 /* the WebGL canvas must never intercept clicks (it paints over content) */
 .darkpool,
