@@ -11,15 +11,17 @@ import { usd, statusLabel } from "@/lib/format";
 
 export default function DepositPage() {
   return (
-    <main className="wrap section">
-      <h2>Take a private position</h2>
-      <p className="desc">
-        Your side is hidden. Only a Poseidon commitment to your bet goes on-chain; the ETH you
-        send is escrowed. Save the note that appears after depositing — you need it to claim.
+    <main className="wrap page">
+      <h1>Take a private position</h1>
+      <p className="lead">
+        Your side stays hidden — only a Poseidon commitment to your bet goes on-chain, and the ETH
+        is escrowed. Save the note shown after depositing; you need it to claim.
       </p>
-      <Suspense fallback={<p className="muted mono">Loading…</p>}>
-        <DepositForm />
-      </Suspense>
+      <div className="panel">
+        <Suspense fallback={<p className="muted mono">Loading…</p>}>
+          <DepositForm />
+        </Suspense>
+      </div>
     </main>
   );
 }
@@ -171,20 +173,7 @@ function NoteBackup({ note, hash }: { note: Note; hash?: `0x${string}` }) {
       </div>
       <div className="field">
         <label>Back up this note — you need it to claim</label>
-        <textarea
-          readOnly
-          value={backup}
-          rows={7}
-          style={{
-            background: "var(--panel)",
-            border: "1px solid var(--line-2)",
-            borderRadius: 8,
-            padding: "0.8rem 1rem",
-            color: "var(--fg)",
-            fontFamily: "var(--mono)",
-            fontSize: "0.82rem",
-          }}
-        />
+        <textarea readOnly value={backup} rows={7} />
         <span className="muted" style={{ fontSize: "0.8rem" }}>
           It&apos;s also saved in this browser. Anyone with this note can claim the winnings — keep it safe.
         </span>

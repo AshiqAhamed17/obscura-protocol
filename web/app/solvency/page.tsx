@@ -13,9 +13,9 @@ export default function SolvencyPage() {
   const n = Number(count ?? 0n);
 
   return (
-    <main className="wrap section">
-      <h2>Solvency</h2>
-      <p className="desc">
+    <main className="wrap page">
+      <h1>Solvency</h1>
+      <p className="lead">
         Every settled market&apos;s totals were established by an SP1 proof, not by an operator —
         and they must reconcile with the ETH actually escrowed. Anyone can check that here. No
         individual position is ever revealed.
@@ -49,32 +49,50 @@ function SolvencyCard({ id }: { id: bigint }) {
   return (
     <div className="card">
       <span className={`pill ${statusClass(Number(status))}`}>{statusLabel(Number(status))}</span>
-      <span className="id">MARKET #{id.toString()}</span>
+      <span className="card-id">MARKET #{id.toString()}</span>
       <h3>ETH ≥ {usd(threshold)}</h3>
 
       {!settled ? (
         <div className="meta">
-          <span>positions <b>{depositCount.toString()}</b></span>
-          <span>escrowed <b>{eth(totalPool)}</b></span>
-          <span className="muted">Totals stay hidden until an SP1 proof settles the market.</span>
+          <div className="row">
+            <span>Positions</span>
+            <b>{depositCount.toString()}</b>
+          </div>
+          <div className="row">
+            <span>Escrowed</span>
+            <b>{eth(totalPool)}</b>
+          </div>
+          <p className="card-note muted" style={{ marginTop: "0.4rem" }}>
+            Totals stay hidden until an SP1 proof settles the market.
+          </p>
         </div>
       ) : (
         <div className="meta">
-          <span>won: <b>{sideLabel(Number(winningSide))}</b></span>
-          <span>total Yes <b>{eth(totalYes)}</b></span>
-          <span>total No <b>{eth(totalNo)}</b></span>
-          <span>escrowed <b>{eth(totalPool)}</b></span>
-          <span
-            style={{
-              color: solvent ? "var(--proven)" : "var(--danger)",
-              marginTop: "0.3rem",
-            }}
-          >
-            {solvent ? "✓ proven solvent" : "✗ mismatch"} — Yes + No {solvent ? "=" : "≠"} escrow
-          </span>
-          <span className="muted" style={{ wordBreak: "break-all", fontSize: "0.72rem" }}>
+          <div className="row">
+            <span>Outcome</span>
+            <b className={Number(winningSide) === 1 ? "tag-yes" : "tag-no"}>{sideLabel(Number(winningSide))}</b>
+          </div>
+          <div className="row">
+            <span>Total Yes</span>
+            <b>{eth(totalYes)}</b>
+          </div>
+          <div className="row">
+            <span>Total No</span>
+            <b>{eth(totalNo)}</b>
+          </div>
+          <div className="row">
+            <span>Escrowed</span>
+            <b>{eth(totalPool)}</b>
+          </div>
+          <div className="row" style={{ marginTop: "0.3rem" }}>
+            <span className={solvent ? "tag-yes" : "tag-no"}>
+              {solvent ? "✓ proven solvent" : "✗ mismatch"}
+            </span>
+            <span className="muted">Yes + No {solvent ? "=" : "≠"} escrow</span>
+          </div>
+          <p className="card-note muted">
             root {merkleRoot.slice(0, 10)}…{merkleRoot.slice(-6)}
-          </span>
+          </p>
         </div>
       )}
     </div>

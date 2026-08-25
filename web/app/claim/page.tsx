@@ -17,32 +17,36 @@ export default function ClaimPage() {
   }, []);
 
   return (
-    <main className="wrap section">
-      <h2>Claim your winnings</h2>
-      <p className="desc">
-        Prove you hold a winning note without revealing which deposit it is. The proof is
-        generated in your browser and the payout goes to a recipient bound into it, so the claim
-        can&apos;t be front-run.
+    <main className="wrap page">
+      <h1>Claim your winnings</h1>
+      <p className="lead">
+        Prove you hold a winning note without revealing which deposit it is. The proof is generated
+        in your browser and the payout goes to a recipient bound into it, so the claim can&apos;t be
+        front-run.
       </p>
 
-      {!isConnected && <div className="note">Connect your wallet to claim.</div>}
+      {!isConnected && <div className="panel"><div className="note">Connect your wallet to claim.</div></div>}
       {isConnected && notes.length === 0 && (
-        <div className="note">No saved notes in this browser. Deposit first, or restore a note.</div>
+        <div className="panel">
+          <div className="note">No saved notes in this browser. Deposit first, or restore a note.</div>
+        </div>
       )}
 
       {isConnected && notes.length > 0 && (
-        <div className="form">
-          <div className="field">
-            <label>Your notes</label>
-            <select value={selected} onChange={(e) => setSelected(Number(e.target.value))}>
-              {notes.map((n, i) => (
-                <option key={i} value={i}>
-                  Market #{n.marketId.toString()} · {sideLabel(n.side)} · {eth(n.amount)}
-                </option>
-              ))}
-            </select>
+        <div className="panel">
+          <div className="form">
+            <div className="field">
+              <label>Your notes</label>
+              <select value={selected} onChange={(e) => setSelected(Number(e.target.value))}>
+                {notes.map((n, i) => (
+                  <option key={i} value={i}>
+                    Market #{n.marketId.toString()} · {sideLabel(n.side)} · {eth(n.amount)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <ClaimForm note={notes[selected]} recipient={address as `0x${string}`} />
           </div>
-          <ClaimForm note={notes[selected]} recipient={address as `0x${string}`} />
         </div>
       )}
     </main>
