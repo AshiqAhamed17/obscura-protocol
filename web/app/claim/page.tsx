@@ -128,6 +128,10 @@ function ClaimForm({ note, recipient }: { note: Note; recipient: `0x${string}` }
   const onWinningSide = winningSide !== undefined && note.side === winningSide;
   const alreadySpent = spent === true;
 
+  // proportional (pari-mutuel) payout from the now-public proven aggregates
+  const winningTotal = market ? (winningSide === 1 ? market[9] : market[10]) : 0n;
+  const payout = market && onWinningSide && winningTotal > 0n ? (note.amount * market[6]) / winningTotal : null;
+
   async function claim() {
     setError("");
     setStatus("");
@@ -177,6 +181,16 @@ function ClaimForm({ note, recipient }: { note: Note; recipient: `0x${string}` }
         {market && ` · ETH ≥ ${usd(market[1])}`}
         {isSettled && ` · winning side: ${sideLabel(winningSide!)}`}
       </div>
+
+      {isSettled && onWinningSide && payout !== null && (
+        <div className="payout-est">
+          <div>
+            <span className="payout-k mono">Estimated payout</span>
+            <span className="hint">your stake × pool ÷ winning stake</span>
+          </div>
+          <b className="payout-v tag-yes">{eth(payout)}</b>
+        </div>
+      )}
 
       {market && !isSettled && (
         <div className="note err">

@@ -3,12 +3,17 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { parseEther } from "viem";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { formatEther, parseEther } from "viem";
+import { useAccount, useBalance, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { abi, PREDICTION_MARKET, Side, type Market } from "@/lib/contract";
 import { commitment, newNote, saveNote, type Note } from "@/lib/note";
-import { usd, statusLabel } from "@/lib/format";
+import { usd, statusLabel, priceUsd } from "@/lib/format";
+import { usePriceHistory } from "@/hooks/usePriceHistory";
+import { PriceChart } from "@/components/PriceChart";
+import { Countdown } from "@/components/Countdown";
 import { AmbientField } from "@/components/AmbientField";
+
+const CHIPS = ["0.01", "0.05", "0.1"];
 
 export default function DepositPage() {
   return (
@@ -16,11 +21,11 @@ export default function DepositPage() {
       <AmbientField />
       <main className="wrap page">
         <p className="eyebrow">Deposit</p>
-      <h1>Take a private position</h1>
-      <p className="lead">
-        Your side stays hidden — only a Poseidon commitment to your bet goes on-chain, and the ETH
-        is escrowed. Save the note shown after depositing; you need it to claim.
-      </p>
+        <h1>Take a private position</h1>
+        <p className="lead">
+          Your side stays hidden — only a Poseidon commitment to your bet goes on-chain, and the ETH
+          is escrowed. Save the note shown after depositing; you need it to claim.
+        </p>
         <Suspense fallback={<p className="muted mono">Loading…</p>}>
           <DepositForm />
         </Suspense>
@@ -31,7 +36,7 @@ export default function DepositPage() {
 
 function DepositForm() {
   const params = useSearchParams();
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const [marketId, setMarketId] = useState<string>(params.get("market") ?? "0");
   const [side, setSide] = useState<Side>(Side.Yes);
   const [amount, setAmount] = useState("0.01");
@@ -45,6 +50,7 @@ function DepositForm() {
     args: [BigInt(marketId || "0")],
   });
   const market = marketData as unknown as Market | undefined;
+  const { data: balance } = useBalance({ address });
 
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -90,6 +96,7 @@ function DepositForm() {
     <div className="split">
       {/* left — the form */}
       <div className="panel">
+        {market && <MarketContext market={market} />}
         <div className="form">
           <div className="field">
             <label>Market</label>
@@ -111,10 +118,10 @@ function DepositForm() {
             <label>Your side</label>
             <div className="side-toggle">
               <button type="button" className={side === Side.Yes ? "sel-yes" : ""} onClick={() => setSide(Side.Yes)}>
-                Yes
+                Yes · above
               </button>
               <button type="button" className={side === Side.No ? "sel-no" : ""} onClick={() => setSide(Side.No)}>
-                No
+                No · below
               </button>
             </div>
           </div>
@@ -122,6 +129,18 @@ function DepositForm() {
           <div className="field">
             <label>Amount (ETH)</label>
             <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" />
+            <div className="chips">
+              {CHIPS.map((c) => (
+                <button type="button" key={c} className={`chip ${amount === c ? "on" : ""}`} onClick={() => setAmount(c)}>
+                  {c}
+                </button>
+              ))}
+              {balance && (
+                <span className="chip-balance mono">
+                  balance {Number(formatEther(balance.value)).toLocaleString("en-US", { maximumFractionDigits: 4 })} ETH
+                </span>
+              )}
+            </div>
           </div>
 
           {!isConnected && <div className="note">Connect your wallet to deposit.</div>}
@@ -142,17 +161,19 @@ function DepositForm() {
         </div>
 
         <div className="seal">
-          <div>
-            <span className="k">commitment </span>
-            <span className="commit">{commit ? `${commit.slice(0, 16)}…${commit.slice(-6)}` : "—"}</span>
+          <div className="seal-row">
+            <span className="k">commitment</span>
+            <span className="commit" key={commit ?? "none"}>
+              {commit ? `${commit.slice(0, 16)}…${commit.slice(-6)}` : "—"}
+            </span>
           </div>
-          <div style={{ marginTop: "0.5rem" }}>
-            <span className="k">side </span>
-            <span className="veiled">██ hidden</span>
+          <div className="seal-row">
+            <span className="k">side</span>
+            <span className="veiled">████ hidden</span>
           </div>
-          <div style={{ marginTop: "0.5rem" }}>
-            <span className="k">amount </span>
-            {amount || "0"} ETH
+          <div className="seal-row">
+            <span className="k">amount</span>
+            <span className="mono">{amount || "0"} ETH</span>
           </div>
         </div>
 
@@ -181,7 +202,32 @@ function DepositForm() {
   );
 }
 
+/// A compact live read of the market you're betting on — the same Chainlink line
+/// as the markets page, so you see the target while you size your position.
+function MarketContext({ market }: { market: Market }) {
+  const [feed, threshold, resolveAfter] = market;
+  const { points, current } = usePriceHistory(feed);
+  const target = Number(threshold) / 1e8;
+  const over = current !== null && current >= target;
+  return (
+    <div className="mkt-context">
+      <div className="mkt-context-top">
+        <div>
+          <span className="mkt-context-k mono">Live ETH / USD</span>
+          <span className="mkt-context-px">{current === null ? "—" : priceUsd(current, 0)}</span>
+        </div>
+        <div className="mkt-context-right">
+          <span className={`dist mono ${over ? "tag-yes" : "tag-no"}`}>{over ? "above target" : "below target"}</span>
+          <Countdown resolveAfter={resolveAfter} />
+        </div>
+      </div>
+      <PriceChart points={points} threshold={target} variant="spark" height={52} />
+    </div>
+  );
+}
+
 function NoteBackup({ note, hash }: { note: Note; hash?: `0x${string}` }) {
+  const [copied, setCopied] = useState(false);
   const backup = JSON.stringify(
     {
       marketId: note.marketId.toString(),
@@ -215,8 +261,15 @@ function NoteBackup({ note, hash }: { note: Note; hash?: `0x${string}` }) {
           </span>
         </div>
         <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-          <button className="btn" onClick={() => navigator.clipboard.writeText(backup)}>
-            Copy note
+          <button
+            className="btn"
+            onClick={() => {
+              navigator.clipboard.writeText(backup);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1600);
+            }}
+          >
+            {copied ? "Copied ✓" : "Copy note"}
           </button>
           <Link className="btn" href="/markets">
             Back to markets
