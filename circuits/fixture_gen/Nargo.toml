@@ -1,0 +1,7 @@
+[package]
+name = "fixture_gen"
+type = "bin"
+authors = ["Ashiq Ahamed"]
+
+[dependencies]
+obscura = { path = "../lib" }
