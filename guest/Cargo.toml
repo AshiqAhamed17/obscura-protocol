@@ -1,0 +1,14 @@
+# Standalone workspace: the guest is built for the RISC-V zkVM target via
+# `cargo prove` (invoked by host/build.rs), so it is intentionally NOT a member
+# of the root workspace — that keeps `cargo test`/`cargo build` at the repo root
+# building only host-target crates.
+[workspace]
+
+[package]
+name = "guest"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp1-zkvm = "6.0.1"
+aggregation = { path = "../aggregation" }
