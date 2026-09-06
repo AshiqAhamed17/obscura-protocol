@@ -1,0 +1,22 @@
+/target
+guest/target/
+host/proofs/
+.env
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+# Noir / nargo build artifacts
+circuits/**/target/
+circuits/**/export/
+
+# Local planning / strategy / learning docs — kept out of the public repo
+plan.md
+project-overview.md
+tasks.md
+handover.md
+docs/learn/
+# Design reference screenshots (third-party, local only)
+design/
+# ETHOnline 2026 hackathon rules/partner notes — internal strategy, local only
+ETHOnline/
