@@ -20,3 +20,6 @@ docs/learn/
 design/
 # ETHOnline 2026 hackathon rules/partner notes — internal strategy, local only
 ETHOnline/
+# Claude Code working context + local settings (internal, not for the public repo)
+CLAUDE.md
+.claude/
