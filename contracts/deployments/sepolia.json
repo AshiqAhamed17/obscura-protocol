@@ -3,18 +3,18 @@
   "chainId": 11155111,
   "contracts": {
     "PredictionMarket": {
-      "address": "0x7359B433E925e6e788e6Cd377D02F4e86d76EdF5",
+      "address": "0x3B50a4e83cD1f1AEF171749371A6c25CA07358bD",
       "verified": true,
-      "explorer": "https://sepolia.etherscan.io/address/0x7359B433E925e6e788e6Cd377D02F4e86d76EdF5"
+      "explorer": "https://sepolia.etherscan.io/address/0x3B50a4e83cD1f1AEF171749371A6c25CA07358bD"
     },
     "HonkVerifier": {
-      "address": "0xd8Fd323155064bfB42378D1Db442aeA3bAE7d8d0",
-      "verified": false,
-      "explorer": "https://sepolia.etherscan.io/address/0xd8Fd323155064bfB42378D1Db442aeA3bAE7d8d0"
+      "address": "0xd93A71bDeE0BFe026B6e132c5c99949c9bfE0dF7",
+      "verified": true,
+      "explorer": "https://sepolia.etherscan.io/address/0xd93A71bDeE0BFe026B6e132c5c99949c9bfE0dF7"
     }
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
   "chainlinkEthUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
-  "programVKey": "0x0000000000000000000000000000000000000000000000000000000000000000",
-  "notes": "programVKey is a 0x0 placeholder — deposits and resolution are functional; settleWithProof rejects proofs until the real vkey (from a network-generated proof) is set and the contract redeployed."
+  "programVKey": "0x002ee7dad16e6f740bf442812c70651fc13603e07008447a52d323260cad5f98",
+  "notes": "Real programVKey wired in (not a placeholder) - settleWithProof is live. Smoke-tested: createMarket + deposit (0.001 ETH escrowed) confirmed on-chain. Settlement requires a network-generated SP1 proof (--evm on the Succinct Prover Network)."
 }
