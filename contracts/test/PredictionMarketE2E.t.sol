@@ -68,13 +68,11 @@ contract PredictionMarketE2ETest is Test {
 
         // Settle via the (mock-verified) SP1 proof path: encode the proven
         // totals + root as the proof's public values.
+        uint64[] memory totals = new uint64[](2);
+        totals[0] = 1 ether; // No
+        totals[1] = 1 ether; // Yes
         PredictionMarket.SettlementValues[] memory vals = new PredictionMarket.SettlementValues[](1);
-        vals[0] = PredictionMarket.SettlementValues({
-            marketId: uint64(id),
-            totalYes: 1 ether,
-            totalNo: 1 ether,
-            merkleRoot: ROOT
-        });
+        vals[0] = PredictionMarket.SettlementValues({marketId: uint64(id), outcomeTotals: totals, merkleRoot: ROOT});
         market.settleWithProof(abi.encode(vals), hex"01");
     }
 

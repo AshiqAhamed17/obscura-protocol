@@ -38,13 +38,13 @@ interface ISP1Verifier {
 ///        commitment); it is enforced by the SP1 solvency proof (sum of note
 ///        amounts == totalPool).
 contract PredictionMarket {
-    // Ordering is load-bearing: it must match the claim circuit's `side`
-    // convention (0 = No, 1 = Yes) so `uint8(winningSide)` equals the
-    // circuit's `winning_side` public input.
-    enum Side {
-        No,
-        Yes
-    }
+    // Outcomes are indices: a market has `numOutcomes` buckets and a bet backs
+    // one of them. Binary markets use the convention 0 = No, 1 = Yes (matching
+    // the claim circuit's `winning_outcome` public input); categorical markets
+    // (e.g. "which driver wins") use 0..numOutcomes. The whole pool is split
+    // pari-mutuel among the notes that backed the winning outcome.
+    uint8 internal constant OUTCOME_NO = 0;
+    uint8 internal constant OUTCOME_YES = 1;
 
     enum Status {
         Open,
@@ -84,10 +84,10 @@ contract PredictionMarket {
 
     /// One market's proven settlement, ABI-decoded from an SP1 proof's public
     /// values. Layout must match `aggregation::public_values::SettlementValues`.
+    /// `outcomeTotals` has one entry per market outcome (length 2 for binary).
     struct SettlementValues {
         uint64 marketId;
-        uint64 totalYes;
-        uint64 totalNo;
+        uint64[] outcomeTotals;
         bytes32 merkleRoot;
     }
 
@@ -97,12 +97,11 @@ contract PredictionMarket {
         uint256 resolveAfter;
         uint256 maxPriceStaleness;
         Status status;
-        Side winningSide;
+        uint8 winningOutcome; // resolved winning outcome index, set at resolve
+        uint8 numOutcomes; // number of outcome buckets (2 for binary)
         uint256 totalPool; // total escrowed collateral across all deposits
         uint256 depositCount; // number of commitments = next leaf index
         bytes32 merkleRoot; // commitments-tree root, set at settle
-        uint256 totalYes; // winning/losing per-side totals, set at settle
-        uint256 totalNo;
     }
 
     /// BN254 scalar field modulus. Commitments are Poseidon outputs over this
@@ -117,6 +116,11 @@ contract PredictionMarket {
 
     uint256 public marketCount;
     mapping(uint256 marketId => Market) public markets;
+
+    /// Per-outcome staked totals, set at settlement (length == numOutcomes).
+    /// Stored outside the Market struct so the `markets()` getter stays a flat
+    /// tuple; read via `getOutcomeTotals`.
+    mapping(uint256 marketId => uint256[] outcomeTotals) internal _outcomeTotals;
 
     /// How each market resolves (parallel to `markets` to keep that getter's
     /// tuple stable). Defaults to `ChainlinkFeed` for markets made via the
@@ -140,8 +144,8 @@ contract PredictionMarket {
         uint256 indexed marketId, ResolutionSource source, address resolver, bytes32 sourceRef
     );
     event Deposit(uint256 indexed marketId, bytes32 indexed commitment, uint256 leafIndex, uint256 amount);
-    event MarketResolved(uint256 indexed marketId, Side winningSide, int256 resolvedPrice);
-    event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo);
+    event MarketResolved(uint256 indexed marketId, uint8 winningOutcome, int256 resolvedPrice);
+    event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256[] outcomeTotals);
     event Claimed(uint256 indexed marketId, bytes32 indexed nullifier, address indexed recipient, uint256 payout);
 
     error MarketNotOpen();
@@ -161,6 +165,8 @@ contract PredictionMarket {
     error WrongResolutionMethod();
     error NotResolver();
     error ZeroResolver();
+    error BadOutcomeCount();
+    error OutcomeOutOfRange();
 
     /// @param verifier_ Address of the deployed UltraHonk claim verifier.
     /// @param sp1Verifier_ Address of the SP1 verifier (gateway).
@@ -187,6 +193,7 @@ contract PredictionMarket {
         m.threshold = threshold;
         m.resolveAfter = resolveAfter;
         m.maxPriceStaleness = maxPriceStaleness;
+        m.numOutcomes = 2; // a price-threshold market is binary (No/Yes)
 
         // Chainlink-feed markets resolve trustlessly on-chain; no resolver.
         resolutionConfig[marketId] =
@@ -210,21 +217,27 @@ contract PredictionMarket {
     /// @param resolveAfter Timestamp after which the outcome may be reported.
     /// @param sourceRef  Provenance handle — the pinned subgraph deployment id
     ///                   or CRE workflow id this market is bound to.
+    /// @param numOutcomes Number of outcome buckets (2 for a binary Yes/No
+    ///                   market, N for a categorical market such as "which of N
+    ///                   drivers wins").
     function createMarketWithSource(
         ResolutionSource source,
         address resolver,
         int256 threshold,
         uint256 resolveAfter,
-        bytes32 sourceRef
+        bytes32 sourceRef,
+        uint8 numOutcomes
     ) external returns (uint256 marketId) {
         if (source == ResolutionSource.ChainlinkFeed) revert WrongResolutionMethod();
         if (resolver == address(0)) revert ZeroResolver();
+        if (numOutcomes < 2) revert BadOutcomeCount();
 
         marketId = marketCount++;
         Market storage m = markets[marketId];
         // priceFeed/maxPriceStaleness stay zero: this market is not feed-resolved.
         m.threshold = threshold;
         m.resolveAfter = resolveAfter;
+        m.numOutcomes = numOutcomes;
 
         resolutionConfig[marketId] = ResolutionConfig({source: source, resolver: resolver, sourceRef: sourceRef});
 
@@ -271,11 +284,11 @@ contract PredictionMarket {
         if (price <= 0) revert InvalidPrice();
         if (block.timestamp - updatedAt > m.maxPriceStaleness) revert StalePrice();
 
-        Side winningSide = price >= m.threshold ? Side.Yes : Side.No;
+        uint8 winningOutcome = price >= m.threshold ? OUTCOME_YES : OUTCOME_NO;
         m.status = Status.Resolved;
-        m.winningSide = winningSide;
+        m.winningOutcome = winningOutcome;
 
-        emit MarketResolved(marketId, winningSide, price);
+        emit MarketResolved(marketId, winningOutcome, price);
     }
 
     /// @notice Reports the outcome of a non-feed market (`GraphQuery` /
@@ -283,21 +296,22 @@ contract PredictionMarket {
     ///         `resolver` — the Chainlink DON / CRE forwarder that posts the
     ///         result on-chain — after `resolveAfter`. This is the on-chain
     ///         landing pad for subgraph-metric and CRE-workflow resolution.
-    /// @param winningSide The resolved outcome (0 = No, 1 = Yes).
-    function reportResolution(uint256 marketId, Side winningSide) external {
+    /// @param winningOutcome The resolved outcome index (must be < numOutcomes).
+    function reportResolution(uint256 marketId, uint8 winningOutcome) external {
         Market storage m = markets[marketId];
         ResolutionConfig storage rc = resolutionConfig[marketId];
         if (rc.source == ResolutionSource.ChainlinkFeed) revert WrongResolutionMethod();
         if (msg.sender != rc.resolver) revert NotResolver();
         if (m.status != Status.Open) revert MarketNotOpen();
         if (block.timestamp < m.resolveAfter) revert MarketNotResolvable();
+        if (winningOutcome >= m.numOutcomes) revert OutcomeOutOfRange();
 
         m.status = Status.Resolved;
-        m.winningSide = winningSide;
+        m.winningOutcome = winningOutcome;
 
         // resolvedPrice is 0: this outcome came from an off-chain source, not a
         // price feed. The source + provenance are in `resolutionConfig`.
-        emit MarketResolved(marketId, winningSide, 0);
+        emit MarketResolved(marketId, winningOutcome, 0);
     }
 
     /// @notice Trustlessly settles a batch of resolved markets from an SP1
@@ -320,19 +334,25 @@ contract PredictionMarket {
             SettlementValues memory s = settlements[i];
             Market storage m = markets[s.marketId];
             if (m.status != Status.Resolved) revert MarketNotResolved();
+            // The proven totals must have exactly one entry per outcome bucket.
+            if (s.outcomeTotals.length != m.numOutcomes) revert BadOutcomeCount();
 
-            uint256 totalYes = uint256(s.totalYes);
-            uint256 totalNo = uint256(s.totalNo);
-            // Defense in depth: the proof already ties totals to the notes, but
-            // they must still reconcile with the escrowed collateral on-chain.
-            if (totalYes + totalNo != m.totalPool) revert TotalsMismatch();
+            // Widen to uint256 and sum. Defense in depth: the proof already ties
+            // the totals to the notes, but they must still reconcile with the
+            // escrowed collateral on-chain.
+            uint256[] memory totals = new uint256[](s.outcomeTotals.length);
+            uint256 sum;
+            for (uint256 j = 0; j < s.outcomeTotals.length; j++) {
+                totals[j] = uint256(s.outcomeTotals[j]);
+                sum += totals[j];
+            }
+            if (sum != m.totalPool) revert TotalsMismatch();
 
             m.merkleRoot = s.merkleRoot;
-            m.totalYes = totalYes;
-            m.totalNo = totalNo;
+            _outcomeTotals[s.marketId] = totals;
             m.status = Status.Settled;
 
-            emit MarketSettled(s.marketId, s.merkleRoot, totalYes, totalNo);
+            emit MarketSettled(s.marketId, s.merkleRoot, totals);
         }
     }
 
@@ -354,14 +374,14 @@ contract PredictionMarket {
         if (nullifierSpent[nullifier]) revert NullifierAlreadySpent();
 
         // Public inputs are built from trusted on-chain state (root, marketId,
-        // winningSide) plus the caller-supplied (amount, nullifier, recipient),
+        // winningOutcome) plus the caller-supplied (amount, nullifier, recipient),
         // in the exact order the claim circuit declares them. Building them here
         // — rather than trusting a caller-supplied array — binds the proof to
         // this market's resolved state.
         bytes32[] memory publicInputs = new bytes32[](6);
         publicInputs[0] = m.merkleRoot;
         publicInputs[1] = bytes32(marketId);
-        publicInputs[2] = bytes32(uint256(uint8(m.winningSide)));
+        publicInputs[2] = bytes32(uint256(m.winningOutcome));
         publicInputs[3] = bytes32(amount);
         publicInputs[4] = nullifier;
         publicInputs[5] = bytes32(uint256(uint160(recipient)));
@@ -371,7 +391,8 @@ contract PredictionMarket {
         // Effects before interaction: mark the nullifier spent before paying.
         nullifierSpent[nullifier] = true;
 
-        uint256 totalWinning = m.winningSide == Side.Yes ? m.totalYes : m.totalNo;
+        // Pari-mutuel: the whole pool is split among notes on the winning bucket.
+        uint256 totalWinning = _outcomeTotals[marketId][m.winningOutcome];
         if (totalWinning == 0) revert NoWinningStake();
 
         uint256 payout = (amount * m.totalPool) / totalWinning;
@@ -390,5 +411,11 @@ contract PredictionMarket {
     /// @notice A single commitment leaf by index.
     function commitmentAt(uint256 marketId, uint256 leafIndex) external view returns (bytes32) {
         return _commitments[marketId][leafIndex];
+    }
+
+    /// @notice Per-outcome staked totals for a settled market (length ==
+    ///         numOutcomes). Empty until the market is settled.
+    function getOutcomeTotals(uint256 marketId) external view returns (uint256[] memory) {
+        return _outcomeTotals[marketId];
     }
 }

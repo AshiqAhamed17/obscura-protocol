@@ -46,7 +46,7 @@ contract PredictionMarketBatchE2ETest is Test {
         for (uint256 i = 0; i < expected.length; i++) {
             uint256 id = market.createMarket(address(feed), THRESHOLD, block.timestamp + 1 days, MAX_STALENESS);
             assertEq(id, expected[i].marketId, "market id ordering");
-            uint256 pool = uint256(expected[i].totalYes) + expected[i].totalNo;
+            uint256 pool = _sum(expected[i].outcomeTotals);
             if (pool > 0) {
                 vm.prank(depositor);
                 market.deposit{value: pool}(id, bytes32(uint256(i + 1)));
@@ -64,11 +64,19 @@ contract PredictionMarketBatchE2ETest is Test {
 
         // Every market now holds exactly the proven totals + root.
         for (uint256 i = 0; i < expected.length; i++) {
-            (,,,, PredictionMarket.Status status,,,, bytes32 root, uint256 ty, uint256 tn) = market.markets(i);
+            (,,,, PredictionMarket.Status status,,,,, bytes32 root) = market.markets(i);
             assertEq(uint8(status), uint8(PredictionMarket.Status.Settled), "settled");
-            assertEq(ty, expected[i].totalYes, "totalYes");
-            assertEq(tn, expected[i].totalNo, "totalNo");
+            uint256[] memory totals = market.getOutcomeTotals(i);
+            assertEq(totals[0], uint256(expected[i].outcomeTotals[0]), "outcome 0");
+            assertEq(totals[1], uint256(expected[i].outcomeTotals[1]), "outcome 1");
             assertEq(root, expected[i].merkleRoot, "merkleRoot");
+        }
+    }
+
+    /// Sum of a uint64 array as uint256.
+    function _sum(uint64[] memory xs) internal pure returns (uint256 total) {
+        for (uint256 i = 0; i < xs.length; i++) {
+            total += uint256(xs[i]);
         }
     }
 
@@ -80,7 +88,7 @@ contract PredictionMarketBatchE2ETest is Test {
         // Fund market 0 with the WRONG pool (proven totals won't reconcile).
         for (uint256 i = 0; i < expected.length; i++) {
             market.createMarket(address(feed), THRESHOLD, block.timestamp + 1 days, MAX_STALENESS);
-            uint256 pool = uint256(expected[i].totalYes) + expected[i].totalNo;
+            uint256 pool = _sum(expected[i].outcomeTotals);
             if (i == 0) pool += 1; // tamper
             if (pool > 0) {
                 vm.prank(depositor);

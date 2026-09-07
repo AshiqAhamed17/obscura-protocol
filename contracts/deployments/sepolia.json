@@ -15,7 +15,9 @@
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
   "chainlinkEthUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
-  "programVKey": "0x002ee7dad16e6f740bf442812c70651fc13603e07008447a52d323260cad5f98",
+  "programVKey": "0x00ea0a2fb0d74f55499c4bab306d578547ffa6ded22f3ac080f5b0128f292f82",
+  "deployedProgramVKey": "0x002ee7dad16e6f740bf442812c70651fc13603e07008447a52d323260cad5f98",
+  "deploymentStatus": "The live PredictionMarket/HonkVerifier above are the BINARY baseline (deployed before the categorical/N-outcome refactor). The repo's contract + circuit are now N-outcome; `programVKey` is the NEW guest key. A single redeploy (new verifier + this vkey) is bundled into Phase 4 (CRE). The categorical logic is fully proven locally: 40 Foundry + 17 Rust + 28 Noir tests, incl. a 3-outcome settle+payout and a real-verifier claim E2E.",
   "seededMarkets": {
     "1": "ETH/USD > $3,000 (crypto)",
     "2": "BTC/USD > $100,000 (crypto)",

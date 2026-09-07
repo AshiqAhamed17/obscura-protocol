@@ -9,11 +9,11 @@ use crate::MarketSettlement;
 use alloy_sol_types::{sol, SolValue};
 
 sol! {
-    /// One market's proven settlement, as decoded on-chain.
+    /// One market's proven settlement, as decoded on-chain. `outcomeTotals` has
+    /// one entry per market outcome (length 2 for binary Yes/No markets).
     struct SettlementValues {
         uint64 marketId;
-        uint64 totalYes;
-        uint64 totalNo;
+        uint64[] outcomeTotals;
         bytes32 merkleRoot;
     }
 }
@@ -22,8 +22,7 @@ impl From<&MarketSettlement> for SettlementValues {
     fn from(s: &MarketSettlement) -> Self {
         SettlementValues {
             marketId: s.market_id,
-            totalYes: s.total_yes,
-            totalNo: s.total_no,
+            outcomeTotals: s.outcome_totals.clone(),
             merkleRoot: s.merkle_root.into(),
         }
     }
@@ -44,8 +43,7 @@ pub fn decode(bytes: &[u8]) -> Vec<MarketSettlement> {
         .into_iter()
         .map(|v| MarketSettlement {
             market_id: v.marketId,
-            total_yes: v.totalYes,
-            total_no: v.totalNo,
+            outcome_totals: v.outcomeTotals,
             merkle_root: v.merkleRoot.into(),
         })
         .collect()
@@ -59,8 +57,12 @@ mod tests {
     #[test]
     fn encode_decode_roundtrip() {
         let settlements = vec![
-            MarketSettlement { market_id: 0, total_yes: 100, total_no: 0, merkle_root: [1u8; 32] },
-            MarketSettlement { market_id: 1, total_yes: 300, total_no: 200, merkle_root: [2u8; 32] },
+            MarketSettlement { market_id: 0, outcome_totals: vec![0, 100], merkle_root: [1u8; 32] },
+            MarketSettlement {
+                market_id: 1,
+                outcome_totals: vec![200, 300, 50], // 3-outcome market
+                merkle_root: [2u8; 32],
+            },
         ];
         let bytes = encode(&settlements);
         assert_eq!(decode(&bytes), settlements);

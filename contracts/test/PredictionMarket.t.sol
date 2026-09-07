@@ -26,7 +26,7 @@ contract PredictionMarketTest is Test {
     address carol = makeAddr("carol");
 
     event Deposit(uint256 indexed marketId, bytes32 indexed commitment, uint256 leafIndex, uint256 amount);
-    event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo);
+    event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256[] outcomeTotals);
     event Claimed(uint256 indexed marketId, bytes32 indexed nullifier, address indexed recipient, uint256 payout);
 
     function setUp() public {
@@ -70,7 +70,7 @@ contract PredictionMarketTest is Test {
         assertEq(market.commitmentAt(id, 0), _c(111));
         assertEq(address(market).balance, 1 ether);
 
-        (,,,,,, uint256 totalPool, uint256 depositCount,,,) = market.markets(id);
+        (,,,,,,, uint256 totalPool, uint256 depositCount,) = market.markets(id);
         assertEq(totalPool, 1 ether);
         assertEq(depositCount, 1);
     }
@@ -98,7 +98,7 @@ contract PredictionMarketTest is Test {
         assertEq(leaves[0], _c(111));
         assertEq(leaves[1], _c(222));
 
-        (,,,,,, uint256 totalPool, uint256 depositCount,,,) = market.markets(id);
+        (,,,,,,, uint256 totalPool, uint256 depositCount,) = market.markets(id);
         assertEq(totalPool, 4 ether);
         assertEq(depositCount, 2);
     }
@@ -156,17 +156,17 @@ contract PredictionMarketTest is Test {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
         _resolve(id);
 
-        (,,,, PredictionMarket.Status status, PredictionMarket.Side winningSide,,,,,) = market.markets(id);
+        (,,,, PredictionMarket.Status status, uint8 winningOutcome,,,,) = market.markets(id);
         assertEq(uint8(status), uint8(PredictionMarket.Status.Resolved));
-        assertEq(uint8(winningSide), uint8(PredictionMarket.Side.Yes));
+        assertEq(winningOutcome, 1); // Yes
     }
 
     function test_resolveMarket_noWinsWhenPriceBelowThreshold() public {
         uint256 id = _createMarket(4_000e8, block.timestamp + 1 days);
         _resolve(id);
 
-        (,,,,, PredictionMarket.Side winningSide,,,,,) = market.markets(id);
-        assertEq(uint8(winningSide), uint8(PredictionMarket.Side.No));
+        (,,,,, uint8 winningOutcome,,,,) = market.markets(id);
+        assertEq(winningOutcome, 0); // No
     }
 
     function test_resolveMarket_revertsIfAlreadyResolved() public {
@@ -187,13 +187,17 @@ contract PredictionMarketTest is Test {
         _resolve(id);
     }
 
+    /// Binary settlement: outcome 0 = No (`tn`), outcome 1 = Yes (`ty`).
     function _encodeSettlement(uint64 id, uint64 ty, uint64 tn, bytes32 root)
         internal
         pure
         returns (bytes memory)
     {
+        uint64[] memory totals = new uint64[](2);
+        totals[0] = tn; // No
+        totals[1] = ty; // Yes
         PredictionMarket.SettlementValues[] memory vals = new PredictionMarket.SettlementValues[](1);
-        vals[0] = PredictionMarket.SettlementValues({marketId: id, totalYes: ty, totalNo: tn, merkleRoot: root});
+        vals[0] = PredictionMarket.SettlementValues({marketId: id, outcomeTotals: totals, merkleRoot: root});
         return abi.encode(vals);
     }
 
@@ -201,15 +205,19 @@ contract PredictionMarketTest is Test {
         uint256 id = _resolvedMarketWithPool(1 ether); // pool = 2 ether
         bytes memory pv = _encodeSettlement(uint64(id), 1 ether, 1 ether, _c(0xABCD));
 
+        uint256[] memory expectedTotals = new uint256[](2);
+        expectedTotals[0] = 1 ether; // No
+        expectedTotals[1] = 1 ether; // Yes
         vm.expectEmit(true, false, false, true);
-        emit MarketSettled(id, _c(0xABCD), 1 ether, 1 ether);
+        emit MarketSettled(id, _c(0xABCD), expectedTotals);
         market.settleWithProof(pv, hex"01");
 
-        (,,,, PredictionMarket.Status status,,,, bytes32 root, uint256 ty, uint256 tn) = market.markets(id);
+        (,,,, PredictionMarket.Status status,,,,, bytes32 root) = market.markets(id);
         assertEq(uint8(status), uint8(PredictionMarket.Status.Settled));
         assertEq(root, _c(0xABCD));
-        assertEq(ty, 1 ether);
-        assertEq(tn, 1 ether);
+        uint256[] memory totals = market.getOutcomeTotals(id);
+        assertEq(totals[1], 1 ether); // Yes
+        assertEq(totals[0], 1 ether); // No
     }
 
     function test_settleWithProof_revertsOnInvalidProof() public {
@@ -285,6 +293,60 @@ contract PredictionMarketTest is Test {
 
         vm.expectRevert(PredictionMarket.InvalidProof.selector);
         market.claim(id, 1 ether, _c(555), carol, hex"01");
+    }
+
+    // --- categorical (multi-outcome) markets ---
+
+    /// A 3-outcome market ("which of 3 drivers wins") settles from proven
+    /// per-outcome totals and pays the winning bucket pari-mutuel.
+    function test_categorical_threeOutcome_settlesAndPaysWinningBucket() public {
+        // This test contract is the registered resolver for the CRE-sourced market.
+        uint256 id = market.createMarketWithSource(
+            PredictionMarket.ResolutionSource.CreWorkflow,
+            address(this),
+            0,
+            block.timestamp + 1 days,
+            keccak256("2026-spanish-gp"),
+            3
+        );
+
+        // Bets on outcomes 0/1/2 for 1/2/3 ETH — pool = 6 ETH.
+        vm.startPrank(alice);
+        market.deposit{value: 1 ether}(id, _c(11)); // backed outcome 0
+        market.deposit{value: 2 ether}(id, _c(22)); // backed outcome 1
+        market.deposit{value: 3 ether}(id, _c(33)); // backed outcome 2
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 1 days + 1);
+        market.reportResolution(id, 2); // outcome 2 wins
+
+        uint64[] memory totals = new uint64[](3);
+        totals[0] = 1 ether;
+        totals[1] = 2 ether;
+        totals[2] = 3 ether;
+        PredictionMarket.SettlementValues[] memory vals = new PredictionMarket.SettlementValues[](1);
+        vals[0] =
+            PredictionMarket.SettlementValues({marketId: uint64(id), outcomeTotals: totals, merkleRoot: _c(0xABC)});
+        market.settleWithProof(abi.encode(vals), hex"01");
+
+        assertEq(market.getOutcomeTotals(id)[2], 3 ether);
+
+        // Winner on outcome 2 with a 3-ETH note: payout = 3 * 6 / 3 = 6 ETH (the
+        // whole pool, since they were the only staker on the winning outcome).
+        market.claim(id, 3 ether, _c(77), carol, hex"01");
+        assertEq(carol.balance, 6 ether);
+    }
+
+    function test_categorical_createRejectsFewerThanTwoOutcomes() public {
+        vm.expectRevert(PredictionMarket.BadOutcomeCount.selector);
+        market.createMarketWithSource(
+            PredictionMarket.ResolutionSource.CreWorkflow,
+            address(this),
+            0,
+            block.timestamp + 1 days,
+            keccak256("bad"),
+            1
+        );
     }
 
     function test_claim_revertsOnDoubleSpend() public {

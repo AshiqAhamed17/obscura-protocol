@@ -7,14 +7,14 @@ use obscura::{MERKLE_DEPTH, MerkleProof, Note};
 
 fn main(
     market_id: Field,
-    side: Field,
+    outcome: Field,
     amount: Field,
     secret: Field,
     nullifier_secret: Field,
     path_indices: [Field; MERKLE_DEPTH],
     path_siblings: [Field; MERKLE_DEPTH],
 ) -> pub (Field, Field, Field) {
-    let note = Note { market_id, side, amount, secret, nullifier_secret };
+    let note = Note { market_id, outcome, amount, secret, nullifier_secret };
     let commitment = note.commitment();
     let nullifier = note.nullifier();
     let proof = MerkleProof { indices: path_indices, siblings: path_siblings };

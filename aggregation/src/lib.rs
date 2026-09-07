@@ -39,22 +39,11 @@ fn fr_to_bytes(f: Fr) -> FieldBytes {
     out
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Side {
-    Yes,
-    No,
-}
-
-impl Side {
-    /// Field encoding used inside the note commitment. Matches the Noir
-    /// convention: 0 = No, 1 = Yes.
-    fn to_field(self) -> Fr {
-        match self {
-            Side::No => Fr::from(0u64),
-            Side::Yes => Fr::from(1u64),
-        }
-    }
-}
+/// A note's chosen outcome, encoded as an index into a market's outcome set.
+/// Binary markets use the convention 0 = No, 1 = Yes; categorical markets use
+/// 0..num_outcomes (e.g. one index per driver / per project). Kept as a `u8`
+/// because it feeds a field element inside the commitment.
+pub type Outcome = u8;
 
 /// A trader's note. Carries every field needed to recompute its on-chain
 /// commitment; `market_id` is supplied by the enclosing [`MarketNotes`].
@@ -62,7 +51,7 @@ impl Side {
 /// plain serde (readable across the SP1 io boundary).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Note {
-    pub side: Side,
+    pub outcome: Outcome,
     pub amount: u64,
     pub secret: FieldBytes,
     pub nullifier_secret: FieldBytes,
@@ -70,11 +59,12 @@ pub struct Note {
 
 impl Note {
     /// Poseidon commitment binding all note fields — identical to
-    /// `Note::commitment` in the Noir `obscura` library.
+    /// `Note::commitment` in the Noir `obscura` library. The outcome index is
+    /// hashed as a field element (matching the circuit's `outcome` input).
     pub fn commitment(&self, market_id: u64) -> Fr {
         hash5([
             Fr::from(market_id),
-            self.side.to_field(),
+            Fr::from(self.outcome as u64),
             Fr::from(self.amount),
             to_fr(&self.secret),
             to_fr(&self.nullifier_secret),
@@ -88,9 +78,12 @@ impl Note {
 }
 
 /// One resolved market's full set of committed notes, ready to settle.
+/// `num_outcomes` is the number of buckets the pool is split across (2 for a
+/// binary Yes/No market, N for a categorical market).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketNotes {
     pub market_id: u64,
+    pub num_outcomes: u8,
     pub escrowed_collateral: u64,
     pub notes: Vec<Note>,
 }
@@ -111,12 +104,13 @@ impl MarketNotes {
     }
 }
 
-/// The proven, public result of settling one market.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// The proven, public result of settling one market. `outcome_totals[i]` is the
+/// total staked on outcome `i` (length == the market's `num_outcomes`); the sum
+/// equals the escrowed collateral.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarketSettlement {
     pub market_id: u64,
-    pub total_yes: u64,
-    pub total_no: u64,
+    pub outcome_totals: Vec<u64>,
     /// Commitments-tree root reconstructed from this market's notes (32
     /// big-endian bytes). The on-chain contract checks this against the
     /// market's stored root, so a valid proof attests that these totals were
@@ -131,6 +125,10 @@ pub enum SettlementError {
     Insolvent { market_id: u64 },
     /// Summing amounts overflowed u64 — reject rather than wrap.
     Overflow { market_id: u64 },
+    /// A note's outcome index is >= the market's `num_outcomes`.
+    OutcomeOutOfRange { market_id: u64 },
+    /// A market declared zero outcomes (a binary market has 2).
+    NoOutcomes { market_id: u64 },
 }
 
 /// Settles an entire batch of markets — a variable-size list, not known at
@@ -143,22 +141,25 @@ pub fn settle_batch(markets: &[MarketNotes]) -> Result<Vec<MarketSettlement>, Se
 }
 
 fn settle_market(market: &MarketNotes) -> Result<MarketSettlement, SettlementError> {
-    let mut total_yes: u64 = 0;
-    let mut total_no: u64 = 0;
+    if market.num_outcomes == 0 {
+        return Err(SettlementError::NoOutcomes { market_id: market.market_id });
+    }
+    let mut outcome_totals = vec![0u64; market.num_outcomes as usize];
 
     for note in &market.notes {
-        let bucket = match note.side {
-            Side::Yes => &mut total_yes,
-            Side::No => &mut total_no,
-        };
+        let bucket = outcome_totals
+            .get_mut(note.outcome as usize)
+            .ok_or(SettlementError::OutcomeOutOfRange { market_id: market.market_id })?;
         *bucket = bucket
             .checked_add(note.amount)
             .ok_or(SettlementError::Overflow { market_id: market.market_id })?;
     }
 
-    let total = total_yes
-        .checked_add(total_no)
-        .ok_or(SettlementError::Overflow { market_id: market.market_id })?;
+    let mut total: u64 = 0;
+    for t in &outcome_totals {
+        total =
+            total.checked_add(*t).ok_or(SettlementError::Overflow { market_id: market.market_id })?;
+    }
 
     if total != market.escrowed_collateral {
         return Err(SettlementError::Insolvent { market_id: market.market_id });
@@ -169,8 +170,7 @@ fn settle_market(market: &MarketNotes) -> Result<MarketSettlement, SettlementErr
     // notes under this root.
     Ok(MarketSettlement {
         market_id: market.market_id,
-        total_yes,
-        total_no,
+        outcome_totals,
         merkle_root: market.merkle_root_bytes(),
     })
 }
@@ -230,9 +230,13 @@ mod tests {
     use super::*;
     use ark_ff::{BigInteger, PrimeField};
 
-    fn note(side: Side, amount: u64) -> Note {
-        Note { side, amount, secret: [0u8; 32], nullifier_secret: [0u8; 32] }
+    fn note(outcome: Outcome, amount: u64) -> Note {
+        Note { outcome, amount, secret: [0u8; 32], nullifier_secret: [0u8; 32] }
     }
+
+    // Binary-market outcome convention (matches on-chain Side enum): 0 = No, 1 = Yes.
+    const NO: Outcome = 0;
+    const YES: Outcome = 1;
 
     /// A u64 as a 32-byte big-endian field element (for test secrets).
     fn be32(n: u64) -> [u8; 32] {
@@ -255,17 +259,45 @@ mod tests {
     fn settles_a_single_solvent_market() {
         let markets = vec![MarketNotes {
             market_id: 0,
+            num_outcomes: 2,
             escrowed_collateral: 300,
-            notes: vec![note(Side::Yes, 100), note(Side::Yes, 50), note(Side::No, 150)],
+            notes: vec![note(YES, 100), note(YES, 50), note(NO, 150)],
         }];
 
         let result = settle_batch(&markets).unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].market_id, 0);
-        assert_eq!(result[0].total_yes, 150);
-        assert_eq!(result[0].total_no, 150);
+        assert_eq!(result[0].outcome_totals, vec![150, 150]); // [No, Yes]
         assert_eq!(result[0].merkle_root, markets[0].merkle_root_bytes());
+    }
+
+    #[test]
+    fn settles_a_categorical_market_with_three_outcomes() {
+        // e.g. "which of 3 drivers wins" — pool split across 3 buckets.
+        let markets = vec![MarketNotes {
+            market_id: 9,
+            num_outcomes: 3,
+            escrowed_collateral: 600,
+            notes: vec![note(0, 100), note(2, 300), note(1, 50), note(2, 150)],
+        }];
+
+        let result = settle_batch(&markets).unwrap();
+        assert_eq!(result[0].outcome_totals, vec![100, 50, 450]);
+    }
+
+    #[test]
+    fn rejects_outcome_index_at_or_above_num_outcomes() {
+        let markets = vec![MarketNotes {
+            market_id: 4,
+            num_outcomes: 2,
+            escrowed_collateral: 100,
+            notes: vec![note(2, 100)], // outcome 2 invalid in a 2-outcome market
+        }];
+        assert_eq!(
+            settle_batch(&markets).unwrap_err(),
+            SettlementError::OutcomeOutOfRange { market_id: 4 }
+        );
     }
 
     #[test]
@@ -273,15 +305,17 @@ mod tests {
         let markets = vec![
             MarketNotes {
                 market_id: 0,
+                num_outcomes: 2,
                 escrowed_collateral: 100,
-                notes: vec![note(Side::Yes, 100)],
+                notes: vec![note(YES, 100)],
             },
             MarketNotes {
                 market_id: 1,
+                num_outcomes: 2,
                 escrowed_collateral: 500,
-                notes: vec![note(Side::No, 200), note(Side::Yes, 300)],
+                notes: vec![note(NO, 200), note(YES, 300)],
             },
-            MarketNotes { market_id: 2, escrowed_collateral: 0, notes: vec![] },
+            MarketNotes { market_id: 2, num_outcomes: 2, escrowed_collateral: 0, notes: vec![] },
         ];
 
         let result = settle_batch(&markets).unwrap();
@@ -291,9 +325,9 @@ mod tests {
             assert_eq!(r.market_id, markets[i].market_id);
             assert_eq!(r.merkle_root, markets[i].merkle_root_bytes());
         }
-        assert_eq!((result[0].total_yes, result[0].total_no), (100, 0));
-        assert_eq!((result[1].total_yes, result[1].total_no), (300, 200));
-        assert_eq!((result[2].total_yes, result[2].total_no), (0, 0));
+        assert_eq!(result[0].outcome_totals, vec![0, 100]); // [No, Yes]
+        assert_eq!(result[1].outcome_totals, vec![200, 300]);
+        assert_eq!(result[2].outcome_totals, vec![0, 0]);
     }
 
     #[test]
@@ -305,8 +339,9 @@ mod tests {
     fn detects_insolvency_when_notes_dont_match_collateral() {
         let markets = vec![MarketNotes {
             market_id: 7,
+            num_outcomes: 2,
             escrowed_collateral: 1_000,
-            notes: vec![note(Side::Yes, 100), note(Side::No, 100)],
+            notes: vec![note(YES, 100), note(NO, 100)],
         }];
 
         let err = settle_batch(&markets).unwrap_err();
@@ -318,13 +353,15 @@ mod tests {
         let markets = vec![
             MarketNotes {
                 market_id: 0,
+                num_outcomes: 2,
                 escrowed_collateral: 100,
-                notes: vec![note(Side::Yes, 100)],
+                notes: vec![note(YES, 100)],
             },
             MarketNotes {
                 market_id: 1,
+                num_outcomes: 2,
                 escrowed_collateral: 999, // doesn't match notes below
-                notes: vec![note(Side::No, 200)],
+                notes: vec![note(NO, 200)],
             },
         ];
 
@@ -336,8 +373,9 @@ mod tests {
     fn rejects_amount_overflow_instead_of_wrapping() {
         let markets = vec![MarketNotes {
             market_id: 0,
+            num_outcomes: 2,
             escrowed_collateral: u64::MAX,
-            notes: vec![note(Side::Yes, u64::MAX), note(Side::Yes, 1)],
+            notes: vec![note(YES, u64::MAX), note(YES, 1)],
         }];
 
         let err = settle_batch(&markets).unwrap_err();
@@ -374,7 +412,7 @@ mod tests {
     fn note_commitment_matches_noir_fixture() {
         // Same witness as circuits/claim/Prover.toml -> the fixture commitment.
         let n = Note {
-            side: Side::Yes,
+            outcome: YES,
             amount: 1_000_000_000_000_000_000,
             secret: be32(111111),
             nullifier_secret: be32(222222),
@@ -422,8 +460,9 @@ mod tests {
     fn market_notes_reconstructs_root_from_its_notes() {
         let m = MarketNotes {
             market_id: 3,
+            num_outcomes: 2,
             escrowed_collateral: 300,
-            notes: vec![note(Side::Yes, 100), note(Side::No, 200)],
+            notes: vec![note(YES, 100), note(NO, 200)],
         };
         let leaves: Vec<Fr> = m.notes.iter().map(|n| n.commitment(3)).collect();
         assert_eq!(m.merkle_root(), merkle_root(&leaves));

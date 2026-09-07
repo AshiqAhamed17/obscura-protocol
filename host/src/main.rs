@@ -8,38 +8,49 @@
 //!   cargo run --release -p host              # execute-only
 //!   cargo run --release -p host -- --prove   # prove + verify + save
 
-use aggregation::{public_values, settle_batch, MarketNotes, Note, Side};
+use aggregation::{public_values, settle_batch, MarketNotes, Note, Outcome};
 use sp1_sdk::blocking::{ProveRequest, Prover, ProverClient};
 use sp1_sdk::{include_elf, Elf, HashableKey, ProvingKey, SP1Stdin};
 
 const GUEST_ELF: Elf = include_elf!("guest");
 const PROOF_PATH: &str = "host/proofs/batch_proof.bin";
 
-fn note(side: Side, amount: u64, seed: u64) -> Note {
+// Binary-market outcome convention (matches the on-chain Side enum): 0 = No, 1 = Yes.
+const NO: Outcome = 0;
+const YES: Outcome = 1;
+
+fn note(outcome: Outcome, amount: u64, seed: u64) -> Note {
     let mut secret = [0u8; 32];
     secret[24..].copy_from_slice(&seed.to_be_bytes());
     let mut nullifier_secret = [0u8; 32];
     nullifier_secret[24..].copy_from_slice(&seed.wrapping_add(1).to_be_bytes());
-    Note { side, amount, secret, nullifier_secret }
+    Note { outcome, amount, secret, nullifier_secret }
 }
 
 fn one_market() -> Vec<MarketNotes> {
     vec![MarketNotes {
         market_id: 0,
+        num_outcomes: 2,
         escrowed_collateral: 300,
-        notes: vec![note(Side::Yes, 100, 1), note(Side::Yes, 50, 2), note(Side::No, 150, 3)],
+        notes: vec![note(YES, 100, 1), note(YES, 50, 2), note(NO, 150, 3)],
     }]
 }
 
 fn several_markets() -> Vec<MarketNotes> {
     vec![
-        MarketNotes { market_id: 0, escrowed_collateral: 100, notes: vec![note(Side::Yes, 100, 1)] },
+        MarketNotes {
+            market_id: 0,
+            num_outcomes: 2,
+            escrowed_collateral: 100,
+            notes: vec![note(YES, 100, 1)],
+        },
         MarketNotes {
             market_id: 1,
+            num_outcomes: 2,
             escrowed_collateral: 500,
-            notes: vec![note(Side::No, 200, 2), note(Side::Yes, 300, 3)],
+            notes: vec![note(NO, 200, 2), note(YES, 300, 3)],
         },
-        MarketNotes { market_id: 2, escrowed_collateral: 0, notes: vec![] },
+        MarketNotes { market_id: 2, num_outcomes: 2, escrowed_collateral: 0, notes: vec![] },
     ]
 }
 

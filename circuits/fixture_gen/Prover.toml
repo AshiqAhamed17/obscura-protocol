@@ -1,5 +1,5 @@
 market_id = "0"
-side = "1"
+outcome = "1"
 amount = "1000000000000000000"
 secret = "111111"
 nullifier_secret = "222222"

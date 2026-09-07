@@ -21,7 +21,7 @@ pub use note::Note;
 /// circuit (1.5) will rely on.
 #[test]
 fn note_commitment_is_provable_as_merkle_member() {
-    let note = Note { market_id: 3, side: 1, amount: 500, secret: 99, nullifier_secret: 11 };
+    let note = Note { market_id: 3, outcome: 1, amount: 500, secret: 99, nullifier_secret: 11 };
     let leaf = note.commitment();
     let proof = MerkleProof { indices: [0, 1], siblings: [123, 456] };
     let root = proof.compute_root(leaf);

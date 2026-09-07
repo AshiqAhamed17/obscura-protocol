@@ -25,7 +25,7 @@ contract ResolutionSourceTest is Test {
     event MarketSourceSet(
         uint256 indexed marketId, PredictionMarket.ResolutionSource source, address resolver, bytes32 sourceRef
     );
-    event MarketResolved(uint256 indexed marketId, PredictionMarket.Side winningSide, int256 resolvedPrice);
+    event MarketResolved(uint256 indexed marketId, uint8 winningOutcome, int256 resolvedPrice);
 
     function setUp() public {
         market = new PredictionMarket(
@@ -50,7 +50,7 @@ contract ResolutionSourceTest is Test {
         vm.expectEmit(true, false, false, true);
         emit MarketSourceSet(0, PredictionMarket.ResolutionSource.GraphQuery, resolver, SOURCE_REF);
         uint256 id = market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.GraphQuery, resolver, 10_000_000e8, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.GraphQuery, resolver, 10_000_000e8, block.timestamp + 1 days, SOURCE_REF, 2
         );
         (PredictionMarket.ResolutionSource source, address r, bytes32 ref) = market.resolutionConfig(id);
         assertEq(uint8(source), uint8(PredictionMarket.ResolutionSource.GraphQuery));
@@ -61,14 +61,14 @@ contract ResolutionSourceTest is Test {
     function test_createMarketWithSource_rejectsChainlinkSource() public {
         vm.expectRevert(PredictionMarket.WrongResolutionMethod.selector);
         market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.ChainlinkFeed, resolver, 0, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.ChainlinkFeed, resolver, 0, block.timestamp + 1 days, SOURCE_REF, 2
         );
     }
 
     function test_createMarketWithSource_rejectsZeroResolver() public {
         vm.expectRevert(PredictionMarket.ZeroResolver.selector);
         market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.CreWorkflow, address(0), 0, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.CreWorkflow, address(0), 0, block.timestamp + 1 days, SOURCE_REF, 2
         );
     }
 
@@ -76,44 +76,44 @@ contract ResolutionSourceTest is Test {
 
     function test_reportResolution_byResolver_succeeds() public {
         uint256 id = market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.CreWorkflow, resolver, 0, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.CreWorkflow, resolver, 0, block.timestamp + 1 days, SOURCE_REF, 2
         );
         vm.warp(block.timestamp + 1 days + 1);
 
         vm.expectEmit(true, false, false, true);
-        emit MarketResolved(id, PredictionMarket.Side.Yes, 0);
+        emit MarketResolved(id, 1, 0);
         vm.prank(resolver);
-        market.reportResolution(id, PredictionMarket.Side.Yes);
+        market.reportResolution(id, 1);
 
-        (,,,, PredictionMarket.Status status, PredictionMarket.Side winningSide,,,,,) = market.markets(id);
+        (,,,, PredictionMarket.Status status, uint8 winningOutcome,,,,) = market.markets(id);
         assertEq(uint8(status), uint8(PredictionMarket.Status.Resolved));
-        assertEq(uint8(winningSide), uint8(PredictionMarket.Side.Yes));
+        assertEq(winningOutcome, 1);
     }
 
     function test_reportResolution_byStranger_reverts() public {
         uint256 id = market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.GraphQuery, resolver, 0, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.GraphQuery, resolver, 0, block.timestamp + 1 days, SOURCE_REF, 2
         );
         vm.warp(block.timestamp + 1 days + 1);
         vm.expectRevert(PredictionMarket.NotResolver.selector);
         vm.prank(stranger);
-        market.reportResolution(id, PredictionMarket.Side.Yes);
+        market.reportResolution(id, 1);
     }
 
     function test_reportResolution_beforeResolveAfter_reverts() public {
         uint256 id = market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.GraphQuery, resolver, 0, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.GraphQuery, resolver, 0, block.timestamp + 1 days, SOURCE_REF, 2
         );
         vm.expectRevert(PredictionMarket.MarketNotResolvable.selector);
         vm.prank(resolver);
-        market.reportResolution(id, PredictionMarket.Side.Yes);
+        market.reportResolution(id, 1);
     }
 
     // --- cross-method guards ---
 
     function test_resolveMarket_onNonFeedMarket_reverts() public {
         uint256 id = market.createMarketWithSource(
-            PredictionMarket.ResolutionSource.GraphQuery, resolver, 0, block.timestamp + 1 days, SOURCE_REF
+            PredictionMarket.ResolutionSource.GraphQuery, resolver, 0, block.timestamp + 1 days, SOURCE_REF, 2
         );
         vm.warp(block.timestamp + 1 days + 1);
         vm.expectRevert(PredictionMarket.WrongResolutionMethod.selector);
@@ -125,6 +125,6 @@ contract ResolutionSourceTest is Test {
         vm.warp(block.timestamp + 1 days + 1);
         vm.expectRevert(PredictionMarket.WrongResolutionMethod.selector);
         vm.prank(resolver);
-        market.reportResolution(id, PredictionMarket.Side.Yes);
+        market.reportResolution(id, 1);
     }
 }
