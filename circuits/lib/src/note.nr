@@ -50,7 +50,28 @@ impl Note {
     pub fn nullifier(self) -> Field {
         poseidon::poseidon::bn254::hash_2([self.nullifier_secret, self.market_id])
     }
+
+    /// Foresight nullifier — revealed when a holder proves, after settlement,
+    /// that this note backed the winning outcome ("I was right"), to earn an
+    /// anonymous forecasting credential.
+    ///
+    /// Domain-separated from the spend `nullifier` by offsetting `market_id`
+    /// with `FORESIGHT_DOMAIN`, so:
+    ///  - proving foresight is independent of claiming a payout (a holder can
+    ///    do either, both, or neither — they consume different registries), and
+    ///  - a foresight credential cannot be linked to the note's payout claim,
+    ///    keeping forecasting reputation unlinkable to withdrawal amounts.
+    /// Still deterministic per note (one credential per winning note) so it
+    /// cannot be double-counted.
+    pub fn foresight_nullifier(self) -> Field {
+        poseidon::poseidon::bn254::hash_2([self.nullifier_secret, self.market_id + FORESIGHT_DOMAIN])
+    }
 }
+
+/// Domain-separation constant for the foresight nullifier. A large value so
+/// `market_id + FORESIGHT_DOMAIN` never overlaps a real (small) market id used
+/// by the spend nullifier's `hash_2(nullifier_secret, market_id)`.
+pub global FORESIGHT_DOMAIN: Field = 0x666f7265736967687400000000000000000000000000000000000000;
 
 #[test]
 fn commitment_is_deterministic() {
@@ -144,4 +165,39 @@ fn nullifier_ignores_side_amount_and_secret() {
 fn nullifier_differs_from_commitment() {
     let note = Note { market_id: 1, outcome: 1, amount: 100, secret: 42, nullifier_secret: 7 };
     assert(note.nullifier() != note.commitment());
+}
+
+// --- foresight nullifier ---------------------------------------------------
+
+#[test]
+fn foresight_nullifier_is_deterministic() {
+    let note = Note { market_id: 1, outcome: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    assert(note.foresight_nullifier() == note.foresight_nullifier());
+}
+
+#[test]
+fn foresight_nullifier_differs_from_spend_nullifier() {
+    // Domain separation: the foresight credential must not equal the spend
+    // nullifier, so proving foresight and claiming a payout are independent and
+    // unlinkable.
+    let note = Note { market_id: 1, outcome: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    assert(note.foresight_nullifier() != note.nullifier());
+}
+
+#[test]
+fn foresight_nullifier_binds_market_and_secret() {
+    let a = Note { market_id: 1, outcome: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    let b = Note { market_id: 2, outcome: 1, amount: 100, secret: 42, nullifier_secret: 7 };
+    let c = Note { market_id: 1, outcome: 1, amount: 100, secret: 42, nullifier_secret: 8 };
+    assert(a.foresight_nullifier() != b.foresight_nullifier()); // different market
+    assert(a.foresight_nullifier() != c.foresight_nullifier()); // different secret
+}
+
+#[test]
+fn foresight_nullifier_ignores_outcome_amount_secret() {
+    // Like the spend nullifier, it depends only on (nullifier_secret, market_id)
+    // so a note has exactly one foresight credential.
+    let a = Note { market_id: 1, outcome: 0, amount: 100, secret: 42, nullifier_secret: 7 };
+    let b = Note { market_id: 1, outcome: 1, amount: 999, secret: 43, nullifier_secret: 7 };
+    assert(a.foresight_nullifier() == b.foresight_nullifier());
 }

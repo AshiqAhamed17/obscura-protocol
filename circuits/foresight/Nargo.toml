@@ -1,0 +1,7 @@
+[package]
+name = "foresight"
+type = "bin"
+authors = ["Ashiq Ahamed"]
+
+[dependencies]
+obscura = { path = "../lib" }

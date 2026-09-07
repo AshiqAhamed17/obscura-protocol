@@ -1,0 +1,15 @@
+# Fixture witness for the ForesightRegistry Foundry test. Same note as
+# claim/Prover.toml (market_id=0, outcome=1=Yes, amount=1e18), so the
+# commitment + merkle_root match. Derived values (merkle_root,
+# foresight_nullifier) come from `nargo execute --package fixture_gen`.
+# Regenerate the proof with ../generate-foresight.sh after any change here.
+merkle_root = "0x17caadfb8dac906410d1b4adf67325ce166d73eb47ae5c3dce3e97eb86ac1d95"
+market_id = "0"
+winning_outcome = "1"
+foresight_nullifier = "0x2658f22110374e71e91a51545d5e65dfd08259c56a7adf61b7114d798fe9cbe4"
+outcome = "1"
+amount = "1000000000000000000"
+secret = "111111"
+nullifier_secret = "222222"
+path_indices = ["0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
+path_siblings = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]

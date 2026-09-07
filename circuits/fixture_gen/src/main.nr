@@ -13,11 +13,12 @@ fn main(
     nullifier_secret: Field,
     path_indices: [Field; MERKLE_DEPTH],
     path_siblings: [Field; MERKLE_DEPTH],
-) -> pub (Field, Field, Field) {
+) -> pub (Field, Field, Field, Field) {
     let note = Note { market_id, outcome, amount, secret, nullifier_secret };
     let commitment = note.commitment();
     let nullifier = note.nullifier();
+    let foresight_nullifier = note.foresight_nullifier();
     let proof = MerkleProof { indices: path_indices, siblings: path_siblings };
     let root = proof.compute_root(commitment);
-    (commitment, nullifier, root)
+    (commitment, nullifier, foresight_nullifier, root)
 }
