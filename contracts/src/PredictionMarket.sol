@@ -52,6 +52,36 @@ contract PredictionMarket {
         Settled
     }
 
+    /// How a market's outcome is determined. This is the resolution-source
+    /// abstraction: one market contract, many kinds of markets.
+    /// - `ChainlinkFeed`  — resolved trustlessly on-chain by reading a
+    ///                       Chainlink price feed (`resolveMarket`).
+    /// - `GraphQuery`     — resolved from an on-chain metric indexed by a
+    ///                       subgraph (e.g. "protocol TVL > $X"), reported by
+    ///                       the market's registered resolver (`reportResolution`).
+    /// - `CreWorkflow`    — resolved from an off-chain event (sports, weather,
+    ///                       an API) by a Chainlink CRE workflow, reported by
+    ///                       the market's registered resolver.
+    /// For the two non-feed sources the outcome cannot be read on-chain, so it
+    /// is delivered by the `resolver` address named at creation — in practice
+    /// the Chainlink DON / CRE forwarder that posts a signed report. Resolution
+    /// trust for those markets is therefore the DON + the pinned off-chain
+    /// source (`sourceRef`), never a global admin: this contract has no owner.
+    enum ResolutionSource {
+        ChainlinkFeed,
+        GraphQuery,
+        CreWorkflow
+    }
+
+    /// Resolution metadata, stored parallel to `Market` so the `markets()`
+    /// getter tuple is unchanged. For `ChainlinkFeed` markets `resolver` and
+    /// `sourceRef` are unused (the feed lives in `Market.priceFeed`).
+    struct ResolutionConfig {
+        ResolutionSource source;
+        address resolver; // authorized reporter for non-feed sources
+        bytes32 sourceRef; // pinned subgraph-deployment / workflow id (provenance)
+    }
+
     /// One market's proven settlement, ABI-decoded from an SP1 proof's public
     /// values. Layout must match `aggregation::public_values::SettlementValues`.
     struct SettlementValues {
@@ -88,6 +118,11 @@ contract PredictionMarket {
     uint256 public marketCount;
     mapping(uint256 marketId => Market) public markets;
 
+    /// How each market resolves (parallel to `markets` to keep that getter's
+    /// tuple stable). Defaults to `ChainlinkFeed` for markets made via the
+    /// original `createMarket`.
+    mapping(uint256 marketId => ResolutionConfig) public resolutionConfig;
+
     /// Leaves of each market's commitments tree, in insertion order. Public so
     /// anyone can reconstruct the tree/root off-chain and check the operator's
     /// (M1) or SP1's (M2) reported root against it.
@@ -101,6 +136,9 @@ contract PredictionMarket {
     mapping(bytes32 nullifier => bool spent) public nullifierSpent;
 
     event MarketCreated(uint256 indexed marketId, address priceFeed, int256 threshold, uint256 resolveAfter);
+    event MarketSourceSet(
+        uint256 indexed marketId, ResolutionSource source, address resolver, bytes32 sourceRef
+    );
     event Deposit(uint256 indexed marketId, bytes32 indexed commitment, uint256 leafIndex, uint256 amount);
     event MarketResolved(uint256 indexed marketId, Side winningSide, int256 resolvedPrice);
     event MarketSettled(uint256 indexed marketId, bytes32 merkleRoot, uint256 totalYes, uint256 totalNo);
@@ -120,6 +158,9 @@ contract PredictionMarket {
     error InvalidProof();
     error NoWinningStake();
     error TransferFailed();
+    error WrongResolutionMethod();
+    error NotResolver();
+    error ZeroResolver();
 
     /// @param verifier_ Address of the deployed UltraHonk claim verifier.
     /// @param sp1Verifier_ Address of the SP1 verifier (gateway).
@@ -147,7 +188,48 @@ contract PredictionMarket {
         m.resolveAfter = resolveAfter;
         m.maxPriceStaleness = maxPriceStaleness;
 
+        // Chainlink-feed markets resolve trustlessly on-chain; no resolver.
+        resolutionConfig[marketId] =
+            ResolutionConfig({source: ResolutionSource.ChainlinkFeed, resolver: address(0), sourceRef: bytes32(0)});
+
         emit MarketCreated(marketId, priceFeed, threshold, resolveAfter);
+        emit MarketSourceSet(marketId, ResolutionSource.ChainlinkFeed, address(0), bytes32(0));
+    }
+
+    /// @notice Creates a market whose outcome comes from a non-feed source (a
+    ///         subgraph metric or a CRE workflow). Because such outcomes can't
+    ///         be read on-chain, `resolver` — named here at creation, in
+    ///         practice the Chainlink DON / CRE forwarder — is the only address
+    ///         allowed to report the result via `reportResolution`. Creation is
+    ///         permissionless; the contract has no owner.
+    /// @param source     Must be `GraphQuery` or `CreWorkflow` (use
+    ///                   `createMarket` for `ChainlinkFeed`).
+    /// @param resolver   Address authorized to report this market's outcome.
+    /// @param threshold  Optional numeric threshold for display/analytics (the
+    ///                   off-chain resolver applies it); 0 if unused.
+    /// @param resolveAfter Timestamp after which the outcome may be reported.
+    /// @param sourceRef  Provenance handle — the pinned subgraph deployment id
+    ///                   or CRE workflow id this market is bound to.
+    function createMarketWithSource(
+        ResolutionSource source,
+        address resolver,
+        int256 threshold,
+        uint256 resolveAfter,
+        bytes32 sourceRef
+    ) external returns (uint256 marketId) {
+        if (source == ResolutionSource.ChainlinkFeed) revert WrongResolutionMethod();
+        if (resolver == address(0)) revert ZeroResolver();
+
+        marketId = marketCount++;
+        Market storage m = markets[marketId];
+        // priceFeed/maxPriceStaleness stay zero: this market is not feed-resolved.
+        m.threshold = threshold;
+        m.resolveAfter = resolveAfter;
+
+        resolutionConfig[marketId] = ResolutionConfig({source: source, resolver: resolver, sourceRef: sourceRef});
+
+        emit MarketCreated(marketId, address(0), threshold, resolveAfter);
+        emit MarketSourceSet(marketId, source, resolver, sourceRef);
     }
 
     /// @notice Takes a private position: escrows `msg.value` and appends the
@@ -179,6 +261,11 @@ contract PredictionMarket {
         Market storage m = markets[marketId];
         if (m.status != Status.Open) revert MarketNotOpen();
         if (block.timestamp < m.resolveAfter) revert MarketNotResolvable();
+        // Only feed-resolved markets can be settled trustlessly on-chain here;
+        // Graph/CRE markets are delivered via reportResolution.
+        if (resolutionConfig[marketId].source != ResolutionSource.ChainlinkFeed) {
+            revert WrongResolutionMethod();
+        }
 
         (, int256 price,, uint256 updatedAt,) = m.priceFeed.latestRoundData();
         if (price <= 0) revert InvalidPrice();
@@ -189,6 +276,28 @@ contract PredictionMarket {
         m.winningSide = winningSide;
 
         emit MarketResolved(marketId, winningSide, price);
+    }
+
+    /// @notice Reports the outcome of a non-feed market (`GraphQuery` /
+    ///         `CreWorkflow`). Callable only by the market's registered
+    ///         `resolver` — the Chainlink DON / CRE forwarder that posts the
+    ///         result on-chain — after `resolveAfter`. This is the on-chain
+    ///         landing pad for subgraph-metric and CRE-workflow resolution.
+    /// @param winningSide The resolved outcome (0 = No, 1 = Yes).
+    function reportResolution(uint256 marketId, Side winningSide) external {
+        Market storage m = markets[marketId];
+        ResolutionConfig storage rc = resolutionConfig[marketId];
+        if (rc.source == ResolutionSource.ChainlinkFeed) revert WrongResolutionMethod();
+        if (msg.sender != rc.resolver) revert NotResolver();
+        if (m.status != Status.Open) revert MarketNotOpen();
+        if (block.timestamp < m.resolveAfter) revert MarketNotResolvable();
+
+        m.status = Status.Resolved;
+        m.winningSide = winningSide;
+
+        // resolvedPrice is 0: this outcome came from an off-chain source, not a
+        // price feed. The source + provenance are in `resolutionConfig`.
+        emit MarketResolved(marketId, winningSide, 0);
     }
 
     /// @notice Trustlessly settles a batch of resolved markets from an SP1
