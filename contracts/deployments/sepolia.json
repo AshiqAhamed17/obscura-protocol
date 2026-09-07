@@ -16,5 +16,19 @@
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
   "chainlinkEthUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
   "programVKey": "0x002ee7dad16e6f740bf442812c70651fc13603e07008447a52d323260cad5f98",
-  "notes": "Real programVKey wired in (not a placeholder) - settleWithProof is live. Smoke-tested: createMarket + deposit (0.001 ETH escrowed) confirmed on-chain. Settlement requires a network-generated SP1 proof (--evm on the Succinct Prover Network)."
+  "seededMarkets": {
+    "1": "ETH/USD > $3,000 (crypto)",
+    "2": "BTC/USD > $100,000 (crypto)",
+    "3": "LINK/USD > $15 (crypto)",
+    "4": "XAU/USD > $4,500 (gold / commodity)",
+    "5": "EUR/USD > 1.15 (forex)"
+  },
+  "verifiedFeeds": {
+    "ETH_USD": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+    "BTC_USD": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43",
+    "LINK_USD": "0xc59E3633BAAC79493d908e63626716e204A45EdF",
+    "XAU_USD": "0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea",
+    "EUR_USD": "0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910"
+  },
+  "notes": "Real programVKey wired in (not a placeholder) - settleWithProof is live. A diverse board of price-threshold markets (crypto/gold/forex) is seeded via script/CreateMarkets.s.sol; each feed was verified live and non-stale on-chain (dead JPY and stale GBP/DAI feeds excluded). Multi-feed resolution proven on-chain across ETH (No), BTC (Yes), and gold (No). Settlement requires a network-generated SP1 proof (--evm on the Succinct Prover Network)."
 }
