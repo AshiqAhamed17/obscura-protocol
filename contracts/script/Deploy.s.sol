@@ -18,9 +18,15 @@ contract Deploy is Script {
     /// https://github.com/succinctlabs/sp1-contracts before mainnet use.
     address constant DEFAULT_SP1_GATEWAY = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
 
+    /// Canonical USDC on Ethereum Sepolia (Circle-issued, 6 decimals). Override
+    /// with `COLLATERAL_TOKEN` per target chain — e.g. Arc testnet USDC
+    /// `0x3600000000000000000000000000000000000000`, or a chain's mainnet USDC.
+    address constant DEFAULT_COLLATERAL = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
+
     function run() external returns (PredictionMarket market, HonkVerifier verifier) {
         address sp1Gateway = vm.envOr("SP1_VERIFIER_GATEWAY", DEFAULT_SP1_GATEWAY);
         bytes32 programVKey = vm.envOr("PROGRAM_VKEY", bytes32(0));
+        address collateral = vm.envOr("COLLATERAL_TOKEN", DEFAULT_COLLATERAL);
 
         if (programVKey == bytes32(0)) {
             console2.log("WARNING: PROGRAM_VKEY is 0x0 - settleWithProof will reject every proof.");
@@ -30,12 +36,13 @@ contract Deploy is Script {
 
         vm.startBroadcast();
         verifier = new HonkVerifier();
-        market = new PredictionMarket(address(verifier), sp1Gateway, programVKey);
+        market = new PredictionMarket(address(verifier), sp1Gateway, programVKey, collateral);
         vm.stopBroadcast();
 
         console2.log("HonkVerifier     :", address(verifier));
         console2.log("PredictionMarket :", address(market));
         console2.log("SP1 gateway      :", sp1Gateway);
+        console2.log("collateral (USDC):", collateral);
         console2.log("programVKey      :");
         console2.logBytes32(programVKey);
     }

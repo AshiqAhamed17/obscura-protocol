@@ -6,6 +6,7 @@ import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggreg
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {MockHonkVerifier} from "./mocks/MockHonkVerifier.sol";
 import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
+import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 contract PredictionMarketTest is Test {
     uint8 constant DECIMALS = 8;
@@ -19,6 +20,7 @@ contract PredictionMarketTest is Test {
     MockV3Aggregator feed;
     MockHonkVerifier verifier;
     MockSP1Verifier sp1Verifier;
+    MockUSDC usdc;
     bytes32 constant PROGRAM_VKEY = bytes32(uint256(0x5f1));
 
     address alice = makeAddr("alice");
@@ -32,12 +34,9 @@ contract PredictionMarketTest is Test {
     function setUp() public {
         verifier = new MockHonkVerifier();
         sp1Verifier = new MockSP1Verifier();
-        // The deployer (this test contract) becomes the operator.
-        market = new PredictionMarket(address(verifier), address(sp1Verifier), PROGRAM_VKEY);
+        usdc = new MockUSDC();
+        market = new PredictionMarket(address(verifier), address(sp1Verifier), PROGRAM_VKEY, address(usdc));
         feed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
-
-        vm.deal(alice, 100 ether);
-        vm.deal(bob, 100 ether);
     }
 
     function _createMarket(int256 threshold, uint256 resolveAfter) internal returns (uint256) {
@@ -46,6 +45,17 @@ contract PredictionMarketTest is Test {
 
     function _c(uint256 v) internal pure returns (bytes32) {
         return bytes32(v);
+    }
+
+    /// Fund `from` with USDC, approve the escrow, and deposit — the ERC-20
+    /// equivalent of the old `deposit{value: amt}`. Sender identity doesn't
+    /// affect deposit accounting (only the commitment is recorded).
+    function _deposit(address from, uint256 id, bytes32 c, uint256 amt) internal returns (uint256 idx) {
+        usdc.mint(from, amt);
+        vm.prank(from);
+        usdc.approve(address(market), amt);
+        vm.prank(from);
+        idx = market.deposit(id, c, amt);
     }
 
     // --- createMarket ---
@@ -63,12 +73,11 @@ contract PredictionMarketTest is Test {
     function test_deposit_storesCommitmentAndEscrows() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
 
-        vm.prank(alice);
-        uint256 leafIndex = market.deposit{value: 1 ether}(id, _c(111));
+        uint256 leafIndex = _deposit(alice, id, _c(111), 1 ether);
 
         assertEq(leafIndex, 0);
         assertEq(market.commitmentAt(id, 0), _c(111));
-        assertEq(address(market).balance, 1 ether);
+        assertEq(usdc.balanceOf(address(market)), 1 ether);
 
         (,,,,,,, uint256 totalPool, uint256 depositCount,) = market.markets(id);
         assertEq(totalPool, 1 ether);
@@ -78,20 +87,22 @@ contract PredictionMarketTest is Test {
     function test_deposit_emitsEventWithLeafIndex() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
 
+        usdc.mint(alice, 2 ether);
+        vm.prank(alice);
+        usdc.approve(address(market), 2 ether);
+
         vm.expectEmit(true, true, false, true);
         emit Deposit(id, _c(222), 0, 2 ether);
 
         vm.prank(alice);
-        market.deposit{value: 2 ether}(id, _c(222));
+        market.deposit(id, _c(222), 2 ether);
     }
 
     function test_deposit_multiple_appendsLeavesInOrderAndSumsPool() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
 
-        vm.prank(alice);
-        market.deposit{value: 1 ether}(id, _c(111));
-        vm.prank(bob);
-        market.deposit{value: 3 ether}(id, _c(222));
+        _deposit(alice, id, _c(111), 1 ether);
+        _deposit(bob, id, _c(222), 3 ether);
 
         bytes32[] memory leaves = market.getCommitments(id);
         assertEq(leaves.length, 2);
@@ -107,24 +118,24 @@ contract PredictionMarketTest is Test {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
         vm.prank(alice);
         vm.expectRevert(PredictionMarket.ZeroAmount.selector);
-        market.deposit{value: 0}(id, _c(111));
+        market.deposit(id, _c(111), 0);
     }
 
     function test_deposit_revertsOnOutOfFieldCommitment() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
         vm.prank(alice);
         vm.expectRevert(PredictionMarket.CommitmentOutOfField.selector);
-        market.deposit{value: 1 ether}(id, bytes32(FIELD_MODULUS));
+        market.deposit(id, bytes32(FIELD_MODULUS), 1 ether);
     }
 
     function test_deposit_revertsOnDuplicateCommitment() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 1 ether}(id, _c(111));
+        _deposit(alice, id, _c(111), 1 ether);
 
+        // Reverts at the duplicate-commitment check, before any token pull.
         vm.prank(bob);
         vm.expectRevert(PredictionMarket.CommitmentAlreadyUsed.selector);
-        market.deposit{value: 1 ether}(id, _c(111));
+        market.deposit(id, _c(111), 1 ether);
     }
 
     function test_deposit_revertsAfterResolution() public {
@@ -133,7 +144,42 @@ contract PredictionMarketTest is Test {
 
         vm.prank(alice);
         vm.expectRevert(PredictionMarket.MarketNotOpen.selector);
-        market.deposit{value: 1 ether}(id, _c(111));
+        market.deposit(id, _c(111), 1 ether);
+    }
+
+    function test_deposit_revertsWithoutApproval() public {
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+        usdc.mint(alice, 1 ether); // funded but never approved the escrow
+        vm.prank(alice);
+        vm.expectRevert(); // MockUSDC: insufficient allowance
+        market.deposit(id, _c(111), 1 ether);
+    }
+
+    // --- depositWithPermit (EIP-2612 gasless approval) ---
+
+    function test_depositWithPermit_setsAllowanceAndEscrows() public {
+        (address signer, uint256 pk) = makeAddrAndKey("permitSigner");
+        uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
+
+        uint256 amount = 5 ether;
+        usdc.mint(signer, amount);
+
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 structHash = keccak256(
+            abi.encode(usdc.PERMIT_TYPEHASH(), signer, address(market), amount, usdc.nonces(signer), deadline)
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", usdc.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+
+        // No prior approve() — a single call sets the allowance from the
+        // signature and deposits.
+        vm.prank(signer);
+        uint256 leafIndex = market.depositWithPermit(id, _c(777), amount, deadline, v, r, s);
+
+        assertEq(leafIndex, 0);
+        assertEq(usdc.balanceOf(address(market)), amount);
+        (,,,,,,, uint256 totalPool,,) = market.markets(id);
+        assertEq(totalPool, amount);
     }
 
     // --- resolveMarket ---
@@ -180,10 +226,8 @@ contract PredictionMarketTest is Test {
 
     function _resolvedMarketWithPool(uint256 poolEach) internal returns (uint256 id) {
         id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: poolEach}(id, _c(111));
-        vm.prank(bob);
-        market.deposit{value: poolEach}(id, _c(222));
+        _deposit(alice, id, _c(111), poolEach);
+        _deposit(bob, id, _c(222), poolEach);
         _resolve(id);
     }
 
@@ -240,8 +284,7 @@ contract PredictionMarketTest is Test {
 
     function test_settleWithProof_revertsIfMarketNotResolved() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 2 ether}(id, _c(111));
+        _deposit(alice, id, _c(111), 2 ether);
         // not resolved
         bytes memory pv = _encodeSettlement(uint64(id), 2 ether, 0, _c(0xABCD));
 
@@ -251,13 +294,11 @@ contract PredictionMarketTest is Test {
 
     // --- claim ---
 
-    /// Deposits 4 ETH, resolves Yes, settles (via SP1 proof) with a 2/2 split.
+    /// Deposits 4 USDC-units, resolves Yes, settles (via SP1 proof) 2/2.
     function _settledYesMarket() internal returns (uint256 id) {
         id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 2 ether}(id, _c(111));
-        vm.prank(bob);
-        market.deposit{value: 2 ether}(id, _c(222));
+        _deposit(alice, id, _c(111), 2 ether);
+        _deposit(bob, id, _c(222), 2 ether);
         _resolve(id); // price == threshold -> Yes wins
         // Trustless settlement: mock SP1 verifier accepts, contract decodes the
         // proven totals + root from the (Solidity-encoded here) public values.
@@ -268,19 +309,18 @@ contract PredictionMarketTest is Test {
         uint256 id = _settledYesMarket();
 
         // pool = 4, winning (Yes) total = 2, claimed note amount = 1
-        // payout = 1 * 4 / 2 = 2 ether
+        // payout = 1 * 4 / 2 = 2 units
         vm.expectEmit(true, true, true, true);
         emit Claimed(id, _c(555), carol, 2 ether);
         market.claim(id, 1 ether, _c(555), carol, hex"01");
 
-        assertEq(carol.balance, 2 ether);
+        assertEq(usdc.balanceOf(carol), 2 ether);
         assertTrue(market.nullifierSpent(_c(555)));
     }
 
     function test_claim_revertsIfNotSettled() public {
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 4 ether}(id, _c(111));
+        _deposit(alice, id, _c(111), 4 ether);
         _resolve(id); // resolved but not settled
 
         vm.expectRevert(PredictionMarket.MarketNotSettled.selector);
@@ -310,12 +350,10 @@ contract PredictionMarketTest is Test {
             3
         );
 
-        // Bets on outcomes 0/1/2 for 1/2/3 ETH — pool = 6 ETH.
-        vm.startPrank(alice);
-        market.deposit{value: 1 ether}(id, _c(11)); // backed outcome 0
-        market.deposit{value: 2 ether}(id, _c(22)); // backed outcome 1
-        market.deposit{value: 3 ether}(id, _c(33)); // backed outcome 2
-        vm.stopPrank();
+        // Bets on outcomes 0/1/2 for 1/2/3 units — pool = 6 units.
+        _deposit(alice, id, _c(11), 1 ether); // backed outcome 0
+        _deposit(alice, id, _c(22), 2 ether); // backed outcome 1
+        _deposit(alice, id, _c(33), 3 ether); // backed outcome 2
 
         vm.warp(block.timestamp + 1 days + 1);
         market.reportResolution(id, 2); // outcome 2 wins
@@ -331,10 +369,10 @@ contract PredictionMarketTest is Test {
 
         assertEq(market.getOutcomeTotals(id)[2], 3 ether);
 
-        // Winner on outcome 2 with a 3-ETH note: payout = 3 * 6 / 3 = 6 ETH (the
+        // Winner on outcome 2 with a 3-unit note: payout = 3 * 6 / 3 = 6 units (the
         // whole pool, since they were the only staker on the winning outcome).
         market.claim(id, 3 ether, _c(77), carol, hex"01");
-        assertEq(carol.balance, 6 ether);
+        assertEq(usdc.balanceOf(carol), 6 ether);
     }
 
     function test_categorical_createRejectsFewerThanTwoOutcomes() public {
@@ -361,8 +399,7 @@ contract PredictionMarketTest is Test {
     function test_claim_revertsWhenNoWinningStake() public {
         // Market resolves Yes but the proven totals have zero Yes stake.
         uint256 id = _createMarket(3_000e8, block.timestamp + 1 days);
-        vm.prank(alice);
-        market.deposit{value: 4 ether}(id, _c(111));
+        _deposit(alice, id, _c(111), 4 ether);
         _resolve(id); // Yes wins
         market.settleWithProof(_encodeSettlement(uint64(id), 0, 4 ether, _c(999)), hex"01");
 

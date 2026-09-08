@@ -6,6 +6,7 @@ import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggreg
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {MockHonkVerifier} from "./mocks/MockHonkVerifier.sol";
 import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
+import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 /// Tests for the resolution-source abstraction (Task 1.1): Chainlink-feed,
 /// Graph-query, and CRE-workflow markets sharing one contract.
@@ -29,7 +30,7 @@ contract ResolutionSourceTest is Test {
 
     function setUp() public {
         market = new PredictionMarket(
-            address(new MockHonkVerifier()), address(new MockSP1Verifier()), bytes32(uint256(0x5f1))
+            address(new MockHonkVerifier()), address(new MockSP1Verifier()), bytes32(uint256(0x5f1)), address(new MockUSDC())
         );
         feed = new MockV3Aggregator(DECIMALS, INITIAL_PRICE);
     }

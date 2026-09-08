@@ -8,6 +8,7 @@ import {ForesightRegistry} from "../src/ForesightRegistry.sol";
 import {ForesightVerifier} from "../src/verifiers/ForesightVerifier.sol";
 import {MockHonkVerifier} from "./mocks/MockHonkVerifier.sol";
 import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
+import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 /// @notice End-to-end Proof of Foresight against the REAL foresight UltraHonk
 ///         verifier using a real proof (circuits/generate-foresight.sh). Proves
@@ -29,6 +30,7 @@ contract ForesightRegistryTest is Test {
     PredictionMarket market;
     ForesightRegistry registry;
     MockV3Aggregator feed;
+    MockUSDC usdc;
 
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -38,16 +40,23 @@ contract ForesightRegistryTest is Test {
     event ForesightProven(uint256 indexed marketId, bytes32 indexed foresightNullifier);
 
     function setUp() public {
+        usdc = new MockUSDC();
         market = new PredictionMarket(
-            address(new MockHonkVerifier()), address(new MockSP1Verifier()), bytes32(uint256(0x5f1))
+            address(new MockHonkVerifier()), address(new MockSP1Verifier()), bytes32(uint256(0x5f1)), address(usdc)
         );
         registry = new ForesightRegistry(address(market), address(new ForesightVerifier()));
         feed = new MockV3Aggregator(DECIMALS, THRESHOLD);
 
-        vm.deal(alice, 100 ether);
-        vm.deal(bob, 100 ether);
-
         proof = vm.readFileBinary("test/fixtures/foresight_proof.bin");
+    }
+
+    /// Fund + approve + deposit in USDC.
+    function _deposit(address from, uint256 id, bytes32 c, uint256 amt) internal {
+        usdc.mint(from, amt);
+        vm.prank(from);
+        usdc.approve(address(market), amt);
+        vm.prank(from);
+        market.deposit(id, c, amt);
     }
 
     /// Market 0: the winning note + one loser (pool = 2e18), resolved Yes and
@@ -56,10 +65,8 @@ contract ForesightRegistryTest is Test {
         id = market.createMarket(address(feed), THRESHOLD, block.timestamp + 1 days, MAX_STALENESS);
         assertEq(id, 0, "fixture assumes market id 0");
 
-        vm.prank(alice);
-        market.deposit{value: 1 ether}(id, COMMITMENT);
-        vm.prank(bob);
-        market.deposit{value: 1 ether}(id, bytes32(uint256(12345)));
+        _deposit(alice, id, COMMITMENT, 1 ether);
+        _deposit(bob, id, bytes32(uint256(12345)), 1 ether);
 
         vm.warp(block.timestamp + 1 days);
         feed.updateAnswer(THRESHOLD);
@@ -95,8 +102,7 @@ contract ForesightRegistryTest is Test {
     function test_proveForesight_revertsIfMarketNotSettled() public {
         // Resolved but not settled: no root yet, so no foresight can be proven.
         uint256 id = market.createMarket(address(feed), THRESHOLD, block.timestamp + 1 days, MAX_STALENESS);
-        vm.prank(alice);
-        market.deposit{value: 1 ether}(id, COMMITMENT);
+        _deposit(alice, id, COMMITMENT, 1 ether);
         vm.warp(block.timestamp + 1 days);
         feed.updateAnswer(THRESHOLD);
         market.resolveMarket(id);

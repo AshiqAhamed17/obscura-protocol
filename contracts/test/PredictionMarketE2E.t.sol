@@ -6,6 +6,7 @@ import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggreg
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {HonkVerifier} from "../src/verifiers/HonkVerifier.sol";
 import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
+import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 /// @notice End-to-end test against the REAL UltraHonk verifier using a real
 ///         proof generated offline (see circuits/generate-fixture.sh). Proves
@@ -33,6 +34,7 @@ contract PredictionMarketE2ETest is Test {
     PredictionMarket market;
     MockV3Aggregator feed;
     HonkVerifier verifier;
+    MockUSDC usdc;
 
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -42,13 +44,20 @@ contract PredictionMarketE2ETest is Test {
     function setUp() public {
         verifier = new HonkVerifier();
         MockSP1Verifier sp1Verifier = new MockSP1Verifier();
-        market = new PredictionMarket(address(verifier), address(sp1Verifier), bytes32(uint256(0x5f1)));
+        usdc = new MockUSDC();
+        market = new PredictionMarket(address(verifier), address(sp1Verifier), bytes32(uint256(0x5f1)), address(usdc));
         feed = new MockV3Aggregator(DECIMALS, PRICE_YES);
 
-        vm.deal(alice, 100 ether);
-        vm.deal(bob, 100 ether);
-
         proof = vm.readFileBinary("test/fixtures/claim_proof.bin");
+    }
+
+    /// Fund + approve + deposit in USDC (replaces the old payable deposit).
+    function _deposit(address from, uint256 id, bytes32 c, uint256 amt) internal {
+        usdc.mint(from, amt);
+        vm.prank(from);
+        usdc.approve(address(market), amt);
+        vm.prank(from);
+        market.deposit(id, c, amt);
     }
 
     /// Sets up market 0: the winning note plus one losing deposit (pool = 2e18),
@@ -57,10 +66,8 @@ contract PredictionMarketE2ETest is Test {
         id = market.createMarket(address(feed), THRESHOLD, block.timestamp + 1 days, MAX_STALENESS);
         assertEq(id, 0, "fixture assumes market id 0");
 
-        vm.prank(alice);
-        market.deposit{value: 1 ether}(id, COMMITMENT); // the winning note
-        vm.prank(bob);
-        market.deposit{value: 1 ether}(id, bytes32(uint256(12345))); // a loser
+        _deposit(alice, id, COMMITMENT, 1 ether); // the winning note
+        _deposit(bob, id, bytes32(uint256(12345)), 1 ether); // a loser
 
         vm.warp(block.timestamp + 1 days);
         feed.updateAnswer(PRICE_YES);
@@ -83,7 +90,7 @@ contract PredictionMarketE2ETest is Test {
 
         // pool = 2e18, winning total = 1e18, claimed amount = 1e18
         // payout = 1e18 * 2e18 / 1e18 = 2e18
-        assertEq(RECIPIENT.balance, 2 ether);
+        assertEq(usdc.balanceOf(RECIPIENT), 2 ether);
         assertTrue(market.nullifierSpent(NULLIFIER));
     }
 

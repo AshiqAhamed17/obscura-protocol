@@ -6,6 +6,7 @@ import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggreg
 import {PredictionMarket} from "../src/PredictionMarket.sol";
 import {MockHonkVerifier} from "./mocks/MockHonkVerifier.sol";
 import {MockSP1Verifier} from "./mocks/MockSP1Verifier.sol";
+import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 /// @notice End-to-end trustless batch settlement, driven by the REAL public
 ///         values produced by the Rust/SP1 guest's ABI encoder
@@ -23,15 +24,25 @@ contract PredictionMarketBatchE2ETest is Test {
     PredictionMarket market;
     MockV3Aggregator feed;
     MockSP1Verifier sp1Verifier;
+    MockUSDC usdc;
 
     address depositor = makeAddr("depositor");
 
     function setUp() public {
         MockHonkVerifier claimVerifier = new MockHonkVerifier();
         sp1Verifier = new MockSP1Verifier();
-        market = new PredictionMarket(address(claimVerifier), address(sp1Verifier), bytes32(uint256(0x5f1)));
+        usdc = new MockUSDC();
+        market = new PredictionMarket(address(claimVerifier), address(sp1Verifier), bytes32(uint256(0x5f1)), address(usdc));
         feed = new MockV3Aggregator(DECIMALS, THRESHOLD);
-        vm.deal(depositor, 100 ether);
+    }
+
+    /// Fund + approve + deposit in USDC.
+    function _deposit(address from, uint256 id, bytes32 c, uint256 amt) internal {
+        usdc.mint(from, amt);
+        vm.prank(from);
+        usdc.approve(address(market), amt);
+        vm.prank(from);
+        market.deposit(id, c, amt);
     }
 
     function test_batchSettle_fromRustEncodedPublicValues() public {
@@ -48,8 +59,7 @@ contract PredictionMarketBatchE2ETest is Test {
             assertEq(id, expected[i].marketId, "market id ordering");
             uint256 pool = _sum(expected[i].outcomeTotals);
             if (pool > 0) {
-                vm.prank(depositor);
-                market.deposit{value: pool}(id, bytes32(uint256(i + 1)));
+                _deposit(depositor, id, bytes32(uint256(i + 1)), pool);
             }
         }
 
@@ -91,8 +101,7 @@ contract PredictionMarketBatchE2ETest is Test {
             uint256 pool = _sum(expected[i].outcomeTotals);
             if (i == 0) pool += 1; // tamper
             if (pool > 0) {
-                vm.prank(depositor);
-                market.deposit{value: pool}(i, bytes32(uint256(i + 1)));
+                _deposit(depositor, i, bytes32(uint256(i + 1)), pool);
             }
         }
 

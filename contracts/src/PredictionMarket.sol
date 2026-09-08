@@ -17,6 +17,29 @@ interface ISP1Verifier {
         view;
 }
 
+/// @notice Minimal ERC-20 surface used for USDC collateral. USDC returns a bool
+///         on transfer/transferFrom; `_callOptionalReturn` also tolerates
+///         non-standard tokens that return nothing.
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+/// @notice EIP-2612 permit (USDC implements it) — lets a depositor approve the
+///         escrow with a signature instead of a separate `approve` transaction.
+interface IERC20Permit {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
+}
+
 /// @title PredictionMarket (Milestone 1 — private positions & verified claims)
 /// @notice Price-threshold prediction markets resolved by a Chainlink Price
 ///         Feed. Positions are private: a deposit escrows collateral and
@@ -34,9 +57,13 @@ interface ISP1Verifier {
 ///        set is also stored on-chain as an immutable anchor, and settlement
 ///        still enforces totalYes + totalNo == totalPool as defense in depth.
 ///      - The consistency between a note's committed `amount` and the escrowed
-///        `msg.value` cannot be checked on-chain (the amount is inside the
-///        commitment); it is enforced by the SP1 solvency proof (sum of note
+///        collateral `amount` cannot be checked on-chain (the amount is inside
+///        the commitment); it is enforced by the SP1 solvency proof (sum of note
 ///        amounts == totalPool).
+///
+/// @dev Collateral is an ERC-20 (USDC). All amounts are the token's base units
+///      (USDC = 6 decimals). The Noir/SP1 `amount` is a generic u64, so USDC
+///      base units drop in unchanged — the crypto core is token-agnostic.
 contract PredictionMarket {
     // Outcomes are indices: a market has `numOutcomes` buckets and a bet backs
     // one of them. Binary markets use the convention 0 = No, 1 = Yes (matching
@@ -113,6 +140,10 @@ contract PredictionMarket {
     ISP1Verifier public immutable sp1Verifier;
     /// Verifying-key hash of the batch-settlement SP1 program.
     bytes32 public immutable programVKey;
+    /// ERC-20 collateral token (USDC). Deposits pull it in; payouts send it out.
+    /// Parameterized at construction so the same contract serves any chain's
+    /// canonical USDC (Sepolia, Arc testnet `0x3600…0000`, mainnet, …).
+    IERC20 public immutable collateral;
 
     uint256 public marketCount;
     mapping(uint256 marketId => Market) public markets;
@@ -162,6 +193,7 @@ contract PredictionMarket {
     error InvalidProof();
     error NoWinningStake();
     error TransferFailed();
+    error ZeroCollateral();
     error WrongResolutionMethod();
     error NotResolver();
     error ZeroResolver();
@@ -171,10 +203,13 @@ contract PredictionMarket {
     /// @param verifier_ Address of the deployed UltraHonk claim verifier.
     /// @param sp1Verifier_ Address of the SP1 verifier (gateway).
     /// @param programVKey_ Verifying-key hash of the batch-settlement SP1 program.
-    constructor(address verifier_, address sp1Verifier_, bytes32 programVKey_) {
+    /// @param collateral_ ERC-20 collateral token (USDC) for this chain.
+    constructor(address verifier_, address sp1Verifier_, bytes32 programVKey_, address collateral_) {
+        if (collateral_ == address(0)) revert ZeroCollateral();
         verifier = IHonkVerifier(verifier_);
         sp1Verifier = ISP1Verifier(sp1Verifier_);
         programVKey = programVKey_;
+        collateral = IERC20(collateral_);
     }
 
     /// @param priceFeed Chainlink AggregatorV3Interface address for the underlying asset.
@@ -245,12 +280,38 @@ contract PredictionMarket {
         emit MarketSourceSet(marketId, source, resolver, sourceRef);
     }
 
-    /// @notice Takes a private position: escrows `msg.value` and appends the
-    ///         note `commitment` as the next leaf of the market's commitments
-    ///         tree. The side and the deposit's link to any future claim stay
-    ///         hidden.
-    function deposit(uint256 marketId, bytes32 commitment) external payable returns (uint256 leafIndex) {
-        if (msg.value == 0) revert ZeroAmount();
+    /// @notice Takes a private position: escrows `amount` USDC (pulled via
+    ///         `transferFrom`, so the caller must `approve` first — or use
+    ///         `depositWithPermit`) and appends the note `commitment` as the next
+    ///         leaf of the market's commitments tree. The side and the deposit's
+    ///         link to any future claim stay hidden.
+    /// @param amount Collateral in USDC base units (6 decimals).
+    function deposit(uint256 marketId, bytes32 commitment, uint256 amount) external returns (uint256 leafIndex) {
+        return _deposit(marketId, commitment, amount);
+    }
+
+    /// @notice Same as `deposit`, but sets the escrow's allowance from an
+    ///         EIP-2612 signature first — a single-transaction, gasless-approval
+    ///         deposit. The `permit` is wrapped in try/catch so a front-run that
+    ///         already consumed the signature (setting the allowance) doesn't
+    ///         brick the deposit.
+    function depositWithPermit(
+        uint256 marketId,
+        bytes32 commitment,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external returns (uint256 leafIndex) {
+        try IERC20Permit(address(collateral)).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
+        return _deposit(marketId, commitment, amount);
+    }
+
+    /// @dev Shared deposit logic. All cheap checks run before any token pull, so
+    ///      a rejected deposit never moves funds (checks-effects-interactions).
+    function _deposit(uint256 marketId, bytes32 commitment, uint256 amount) internal returns (uint256 leafIndex) {
+        if (amount == 0) revert ZeroAmount();
         if (uint256(commitment) >= FIELD_MODULUS) revert CommitmentOutOfField();
 
         Market storage m = markets[marketId];
@@ -261,9 +322,13 @@ contract PredictionMarket {
         leafIndex = m.depositCount;
         _commitments[marketId].push(commitment);
         m.depositCount = leafIndex + 1;
-        m.totalPool += msg.value;
+        m.totalPool += amount;
 
-        emit Deposit(marketId, commitment, leafIndex, msg.value);
+        // Interaction last: pull the collateral in. Reverts (rolling back the
+        // whole deposit) if allowance/balance is insufficient.
+        _safeTransferFrom(msg.sender, address(this), amount);
+
+        emit Deposit(marketId, commitment, leafIndex, amount);
     }
 
     /// @notice Resolves the market against the Chainlink feed. Reverts if the
@@ -399,8 +464,29 @@ contract PredictionMarket {
 
         emit Claimed(marketId, nullifier, recipient, payout);
 
-        (bool ok,) = payable(recipient).call{value: payout}("");
-        if (!ok) revert TransferFailed();
+        // Pay the winner in USDC. Nullifier already marked spent above, so this
+        // interaction cannot be re-entered for a double payout.
+        _safeTransfer(recipient, payout);
+    }
+
+    // --- ERC-20 safe-transfer helpers (SafeERC20-style, self-contained) ---
+
+    function _safeTransfer(address to, uint256 amount) internal {
+        _callOptionalReturn(abi.encodeCall(IERC20.transfer, (to, amount)));
+    }
+
+    function _safeTransferFrom(address from, address to, uint256 amount) internal {
+        _callOptionalReturn(abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
+    }
+
+    /// @dev Calls the collateral token and treats the call as successful only if
+    ///      it did not revert AND either returned no data or returned `true`.
+    ///      Handles USDC (returns bool) and non-standard no-return tokens.
+    function _callOptionalReturn(bytes memory data) private {
+        (bool success, bytes memory returndata) = address(collateral).call(data);
+        if (!success || (returndata.length != 0 && !abi.decode(returndata, (bool)))) {
+            revert TransferFailed();
+        }
     }
 
     /// @notice All commitments (leaves) of a market, in insertion order.
