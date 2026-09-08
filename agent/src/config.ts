@@ -20,5 +20,17 @@ export const MAX_STALENESS_SECONDS = Number(
 
 // Subgraph Studio API key (created in Studio → API Keys). When set, the oracle
 // queries the Studio endpoint authenticated ("querying Subgraphs with an API key
-// from Subgraph Studio"). Secret — supplied via env only, never committed.
+// from Subgraph Studio"). The same key authenticates decentralized-network
+// gateway queries (used for the Messari benchmark). Secret — env only, never committed.
 export const OBSCURA_API_KEY = process.env.OBSCURA_API_KEY ?? "";
+
+// --- Task 2.3: composable/standardized benchmark ---
+// A PUBLISHED, Messari-standardized subgraph on the decentralized network, read
+// via the gateway to benchmark Obscura's risk against live mainnet DeFi. Default
+// is Aave v2 (Ethereum) — a canonical Messari standardized lending subgraph.
+export const GRAPH_GATEWAY = process.env.GRAPH_GATEWAY_URL ?? "https://gateway.thegraph.com/api";
+export const BENCHMARK_SUBGRAPH_ID =
+  process.env.OBSCURA_BENCHMARK_SUBGRAPH_ID ??
+  "C2zniPn45RnLDGzVeGZCx2Sw3GXrbc9gL4ZfL8B8Em2j";
+export const BENCHMARK_LABEL =
+  process.env.OBSCURA_BENCHMARK_LABEL ?? "Aave v2 (Ethereum, Messari standardized)";

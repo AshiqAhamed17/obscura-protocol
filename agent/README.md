@@ -29,8 +29,28 @@ See [`SAMPLE_RUN.md`](./SAMPLE_RUN.md) for a real agent run over live Sepolia da
 | `get_solvency_snapshot` | Escrow on hand, settled obligations, coverage ratio, SOLVENT/WATCH/INSOLVENT verdict + provenance. |
 | `get_market_concentration` | HHI over per-market deposit share, dominant market, DIVERSE→HIGHLY_CONCENTRATED verdict + provenance. |
 | `assess_protocol_risk` | Combined solvency + concentration → overall LOW/ELEVATED/HIGH/CRITICAL with rationale. Primary go/no-go tool. |
+| `benchmark_vs_defi` | **Composition:** reads Obscura *and* a published Messari-standardized subgraph in one flow, benchmarking Obscura's concentration against live mainnet DeFi. |
 
 Each tool accepts an optional `maxStalenessSeconds` to override the freshness budget.
+
+## Composition — Obscura × Messari (standardized) benchmark
+
+`benchmark_vs_defi` composes **two Graph data sources** in a single flow:
+
+1. **Obscura** — our subgraph on Subgraph Studio (Sepolia), read authenticated.
+2. **Benchmark** — a **published, Messari-standardized** subgraph on The Graph's
+   **decentralized network** (default: `Aave v2 Ethereum`), read via the gateway.
+
+Both are freshness-gated. It then computes the Herfindahl concentration index over
+each protocol's markets with the **same methodology** and compares them — turning
+"Obscura HHI = 1.0" from a bare number into "far more concentrated than a mature
+$97M lending market at HHI 0.16, as expected for an early single-market book."
+This satisfies The Graph's *Composable/Standardized* track: standardized schema +
+composition of two Graph products, over live data.
+
+> The benchmark read requires `OBSCURA_API_KEY` (the decentralized-network
+> gateway is key-gated; free tier covers it). Swap the benchmark protocol via
+> `OBSCURA_BENCHMARK_SUBGRAPH_ID` / `OBSCURA_BENCHMARK_LABEL`.
 
 ## Solvency model
 

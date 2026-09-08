@@ -11,8 +11,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { PINNED_DEPLOYMENT_ID, SUBGRAPH_QUERY_URL } from "./config.js";
-import { concentrationReport, protocolRisk, solvencySnapshot } from "./report.js";
+import { BENCHMARK_LABEL, PINNED_DEPLOYMENT_ID, SUBGRAPH_QUERY_URL } from "./config.js";
+import {
+  benchmarkReport,
+  concentrationReport,
+  protocolRisk,
+  solvencySnapshot,
+} from "./report.js";
 
 const server = new McpServer({
   name: "obscura-risk-oracle",
@@ -82,6 +87,24 @@ server.tool(
   async (args) => {
     try {
       return ok(await protocolRisk(args));
+    } catch (e) {
+      return fail(e);
+    }
+  },
+);
+
+server.tool(
+  "benchmark_vs_defi",
+  `Composable benchmark: reads Obscura (Subgraph Studio) AND a published, ` +
+    `Messari-standardized subgraph on The Graph's decentralized network ` +
+    `(${BENCHMARK_LABEL}) in one flow, then compares Obscura's liquidity ` +
+    `concentration (HHI) against live mainnet DeFi using the same methodology. ` +
+    `Both sources are freshness-gated. Requires a gateway API key for the ` +
+    `benchmark read.`,
+  stalenessArg,
+  async (args) => {
+    try {
+      return ok(await benchmarkReport(args));
     } catch (e) {
       return fail(e);
     }

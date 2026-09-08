@@ -3,10 +3,13 @@
 // runs the pure risk math over it.
 
 import { fetchGatedSnapshot } from "./subgraph.js";
+import { fetchBenchmark } from "./messari.js";
 import {
   assessRisk,
+  compareConcentration,
   computeConcentration,
   computeSolvency,
+  herfindahl,
   type MarketRow,
 } from "./risk.js";
 
@@ -62,6 +65,45 @@ export async function concentrationReport(opts?: {
       .filter((m) => m.totalDeposited > 0n)
       .slice(0, topN)
       .map(marketOut),
+  };
+}
+
+// Task 2.3 — composition: our Studio subgraph + a published Messari standardized
+// subgraph, benchmarking Obscura's concentration against live mainnet DeFi.
+export async function benchmarkReport(opts?: { maxStalenessSeconds?: number }) {
+  const [obscura, bench] = await Promise.all([
+    fetchGatedSnapshot(opts),
+    fetchBenchmark(opts),
+  ]);
+
+  const obscuraConc = computeConcentration(obscura.markets);
+  const benchHhi = herfindahl(bench.marketTvlsUSD);
+  const comparison = compareConcentration(
+    obscuraConc.hhi,
+    obscuraConc.activeMarketCount,
+    bench.protocolName,
+    benchHhi.hhi,
+    benchHhi.fundedCount,
+  );
+
+  return {
+    composition: [
+      { role: "subject", source: "Obscura (Subgraph Studio)", provenance: obscura.provenance },
+      { role: "benchmark", source: bench.provenance.source, provenance: bench.provenance },
+    ],
+    obscura: {
+      concentration: obscuraConc,
+      totalDepositedBaseUnits: (obscura.protocol?.totalDeposited ?? 0n).toString(),
+    },
+    benchmark: {
+      protocolName: bench.protocolName,
+      tvlUSD: bench.tvlUSD,
+      hhi: benchHhi.hhi,
+      fundedMarkets: benchHhi.fundedCount,
+      topShare: benchHhi.topShare,
+      topMarkets: bench.topMarkets,
+    },
+    comparison,
   };
 }
 

@@ -5,7 +5,12 @@
 //   npm run assess -- solvency  # solvency snapshot only
 //   npm run assess -- concentration
 
-import { concentrationReport, protocolRisk, solvencySnapshot } from "./report.js";
+import {
+  benchmarkReport,
+  concentrationReport,
+  protocolRisk,
+  solvencySnapshot,
+} from "./report.js";
 
 async function main() {
   const which = process.argv[2] ?? "risk";
@@ -17,11 +22,14 @@ async function main() {
     case "concentration":
       out = await concentrationReport();
       break;
+    case "benchmark":
+      out = await benchmarkReport();
+      break;
     case "risk":
       out = await protocolRisk();
       break;
     default:
-      console.error(`Unknown report "${which}". Use: risk | solvency | concentration`);
+      console.error(`Unknown report "${which}". Use: risk | solvency | concentration | benchmark`);
       process.exit(2);
   }
   console.log(JSON.stringify(out, null, 2));

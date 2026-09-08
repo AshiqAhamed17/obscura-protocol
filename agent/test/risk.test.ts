@@ -2,8 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   assessRisk,
+  compareConcentration,
   computeConcentration,
   computeSolvency,
+  herfindahl,
   type MarketRow,
 } from "../src/risk.js";
 
@@ -89,4 +91,37 @@ test("assessRisk: solvent + highly concentrated => ELEVATED (the current live sh
 test("assessRisk: insolvent => CRITICAL regardless of concentration", () => {
   const r = assessRisk(100n, 150n, [mkt("0", "Settled", 100n, 150n, 100n, 0n)]);
   assert.equal(r.overallRisk, "CRITICAL");
+});
+
+test("herfindahl: single value => 1.0", () => {
+  const r = herfindahl([1000, 0, 0]);
+  assert.equal(r.hhi, 1);
+  assert.equal(r.fundedCount, 1);
+  assert.equal(r.topShare, 1);
+});
+
+test("herfindahl: four equal => 0.25", () => {
+  const r = herfindahl([10, 10, 10, 10]);
+  assert.equal(r.hhi, 0.25);
+  assert.equal(r.fundedCount, 4);
+});
+
+test("herfindahl: empty => 0", () => {
+  assert.equal(herfindahl([]).hhi, 0);
+});
+
+test("compareConcentration: Obscura 1.0 vs Aave ~0.16 => FAR_MORE_CONCENTRATED", () => {
+  const c = compareConcentration(1.0, 1, "Aave v2", 0.16, 37);
+  assert.equal(c.verdict, "FAR_MORE_CONCENTRATED");
+  assert.equal(c.hhiDelta, 0.84);
+});
+
+test("compareConcentration: similar spreads => COMPARABLE", () => {
+  const c = compareConcentration(0.2, 5, "Aave v2", 0.16, 37);
+  assert.equal(c.verdict, "COMPARABLE");
+});
+
+test("compareConcentration: more diverse => MORE_DIVERSE", () => {
+  const c = compareConcentration(0.05, 20, "Aave v2", 0.3, 4);
+  assert.equal(c.verdict, "MORE_DIVERSE");
 });

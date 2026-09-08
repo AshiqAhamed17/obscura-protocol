@@ -118,12 +118,48 @@ over stale or wrong-deployment data.
 
 ---
 
+## 5. Composition — benchmark vs live DeFi (`benchmark_vs_defi`, Task 2.3)
+
+The agent composes **two Graph sources in one flow** and benchmarks Obscura's
+concentration against live mainnet DeFi using the same HHI methodology:
+
+- **Obscura** — Subgraph Studio (Sepolia), block `11660558`, authenticated.
+- **Aave v2 (Ethereum, Messari standardized)** — published subgraph on the
+  decentralized network via the gateway, block `25932101`, `$97.6M` TVL.
+
+```json
+{
+  "comparison": {
+    "obscuraHhi": 1,
+    "obscuraFundedMarkets": 1,
+    "benchmarkName": "Aave v2",
+    "benchmarkHhi": 0.16,
+    "benchmarkFundedMarkets": 37,
+    "hhiDelta": 0.84,
+    "verdict": "FAR_MORE_CONCENTRATED"
+  }
+}
+```
+
+> **Agent reasoning.** Obscura's HHI of 1.0 is not mismanagement — benchmarked
+> against a mature $97.6M lending market spread over 37 markets (HHI 0.16),
+> it's the signature of an **early, single-funded-market book**. Aave's 0.16 is
+> the diversification *target*: as Obscura's other 7 seeded markets attract
+> deposits, expect HHI to fall toward benchmark levels. Both reads were
+> freshness-gated (11s old, well inside budget) before the comparison was made.
+
+This satisfies The Graph **Composable/Standardized** track: a standardized
+schema (Messari) + composition of two Graph products, over live data.
+
+---
+
 ### Reproduce
 
 ```bash
 cd agent && npm install
-npm run assess            # combined assessment over live data (CLI, same code path)
-npm test                  # 10 unit tests over the risk math
+npm run assess                     # combined solvency+concentration over live data
+OBSCURA_API_KEY=<studio-key> npm run assess benchmark   # the Obscura × Messari composition
+npm test                           # 16 unit tests over the risk + benchmark math
 # stale refusal:      OBSCURA_MAX_STALENESS=1 npm run assess
 # provenance refusal: OBSCURA_DEPLOYMENT_ID=QmWrong npm run assess
 ```

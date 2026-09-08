@@ -151,6 +151,88 @@ export function computeConcentration(markets: MarketRow[]): ConcentrationResult 
   };
 }
 
+// --- Task 2.3: cross-protocol concentration benchmark ---
+
+export interface Hhi {
+  hhi: number;
+  fundedCount: number;
+  topShare: number;
+}
+
+// Herfindahl-Hirschman Index over a list of positive values (e.g. per-market
+// USD TVL). Same methodology as computeConcentration, for float inputs.
+export function herfindahl(values: number[]): Hhi {
+  const positive = values.filter((v) => v > 0);
+  const total = positive.reduce((a, b) => a + b, 0);
+  if (total === 0) return { hhi: 0, fundedCount: 0, topShare: 0 };
+  let hhi = 0;
+  let topShare = 0;
+  for (const v of positive) {
+    const share = v / total;
+    hhi += share * share;
+    if (share > topShare) topShare = share;
+  }
+  return {
+    hhi: Math.round(hhi * 10_000) / 10_000,
+    fundedCount: positive.length,
+    topShare: Math.round(topShare * 10_000) / 10_000,
+  };
+}
+
+export type BenchmarkVerdict =
+  | "FAR_MORE_CONCENTRATED"
+  | "MORE_CONCENTRATED"
+  | "COMPARABLE"
+  | "MORE_DIVERSE";
+
+export interface ConcentrationBenchmark {
+  obscuraHhi: number;
+  obscuraFundedMarkets: number;
+  benchmarkName: string;
+  benchmarkHhi: number;
+  benchmarkFundedMarkets: number;
+  hhiDelta: number; // obscura - benchmark
+  verdict: BenchmarkVerdict;
+  rationale: string;
+}
+
+export function compareConcentration(
+  obscuraHhi: number,
+  obscuraFundedMarkets: number,
+  benchmarkName: string,
+  benchmarkHhi: number,
+  benchmarkFundedMarkets: number,
+): ConcentrationBenchmark {
+  const hhiDelta = Math.round((obscuraHhi - benchmarkHhi) * 10_000) / 10_000;
+
+  let verdict: BenchmarkVerdict;
+  if (hhiDelta > 0.3) verdict = "FAR_MORE_CONCENTRATED";
+  else if (hhiDelta > 0.1) verdict = "MORE_CONCENTRATED";
+  else if (hhiDelta < -0.1) verdict = "MORE_DIVERSE";
+  else verdict = "COMPARABLE";
+
+  const rationale =
+    `Obscura HHI ${obscuraHhi} across ${obscuraFundedMarkets} funded market(s) vs ` +
+    `${benchmarkName} HHI ${benchmarkHhi} across ${benchmarkFundedMarkets}. ` +
+    `Delta ${hhiDelta >= 0 ? "+" : ""}${hhiDelta} → ${verdict.replace(/_/g, " ").toLowerCase()}. ` +
+    (verdict === "FAR_MORE_CONCENTRATED" || verdict === "MORE_CONCENTRATED"
+      ? `Obscura carries more single-market dependence than this mature protocol — expected for an early book; the benchmark is the diversification target as liquidity spreads.`
+      : verdict === "COMPARABLE"
+        ? `Obscura's liquidity spread is in line with the mature benchmark.`
+        : `Obscura is more diversified than the benchmark.`);
+
+  return {
+    obscuraHhi,
+    obscuraFundedMarkets,
+    benchmarkName,
+    benchmarkHhi,
+    benchmarkFundedMarkets,
+    hhiDelta,
+    verdict,
+    rationale,
+  };
+}
+
 export function assessRisk(
   totalDeposited: bigint,
   totalClaimed: bigint,
