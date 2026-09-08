@@ -1,0 +1,25 @@
+{
+  "name": "obscura-risk-oracle",
+  "version": "0.1.0",
+  "description": "AI Solvency & Risk Oracle — reusable MCP tooling that reasons over the Obscura subgraph with pinned-deployment provenance and freshness gating.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "obscura-risk-oracle": "src/server.ts"
+  },
+  "scripts": {
+    "server": "tsx src/server.ts",
+    "assess": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0"
+  }
+}
