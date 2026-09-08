@@ -1,0 +1,37 @@
+{
+  "network": "arc-testnet",
+  "chainId": 5042002,
+  "rpc": "https://rpc.testnet.arc.network",
+  "explorer": "https://testnet.arcscan.app",
+  "contracts": {
+    "PredictionMarket": {
+      "address": "0xB0bAF72EC2a249376B468B5E6Bbc88CF87099b50",
+      "explorer": "https://testnet.arcscan.app/address/0xB0bAF72EC2a249376B468B5E6Bbc88CF87099b50"
+    },
+    "HonkVerifier": {
+      "address": "0xf3420E595FBb9763b41c2d9eEB991e0d1E273425",
+      "explorer": "https://testnet.arcscan.app/address/0xf3420E595FBb9763b41c2d9eEB991e0d1E273425"
+    }
+  },
+  "collateral": {
+    "symbol": "USDC",
+    "address": "0x3600000000000000000000000000000000000000",
+    "decimals": 6,
+    "note": "Canonical Circle USDC on Arc. On Arc, USDC is also the native gas token (18-dec view); all escrow logic uses the 6-dec ERC-20 view."
+  },
+  "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
+  "deployer": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308",
+  "liveDemo": {
+    "description": "Live USDC-native flow on Arc testnet: a market created via the resolution-source abstraction (Arc has no Chainlink feed, so a controlled resolver is used), a real 5 USDC deposit escrowed into the contract, then resolved. Verified on-chain: market.totalPool == 5000000 and USDC.balanceOf(market) == 5000000.",
+    "amountUSDC": "5.000000",
+    "commitment": "0x061a4960a702e1605e3442b65b6fe17b3ea6b2ca30d7b6135fe1b00b01535252",
+    "transactions": {
+      "createMarket": "https://testnet.arcscan.app/tx/0x743dc67c6fcbab7c4b8e4209ac4d6e9eeb535ce040760f50cdb271f2842555f8",
+      "approveUSDC": "https://testnet.arcscan.app/tx/0xa1266c33ef83803be9bd5f79bf5b99bcf9f7c3ddc2699bf8d72ccbe292a2c93e",
+      "depositUSDC": "https://testnet.arcscan.app/tx/0x1f00a5cf8a7e31c8051be0791b89f38c86dea10f73ebc970c1ea3449b72c4b62",
+      "resolve": "https://testnet.arcscan.app/tx/0x8939ef7e4c90d2ef5b093ac8ed36cefd22c5b849318a999b10a877cfa197759d"
+    }
+  },
+  "settlementNote": "The SP1 verifier gateway is NOT deployed on Arc testnet (verified: no code at 0x397A5f...). Trustless SP1 settlement and the zk claim therefore run on the canonical Sepolia deployment; the identical contract on Arc proves the USDC-denominated escrow. The 47 Foundry tests cover the full deposit->settle->claim in USDC.",
+  "mainnetReady": "script/Deploy.s.sol takes COLLATERAL_TOKEN via env, so the same script deploys to Arc mainnet (chainId 5042) in the Sep 16-30 window with mainnet USDC, no code change."
+}

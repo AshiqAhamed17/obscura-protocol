@@ -14,6 +14,7 @@ fs_permissions = [{ access = "read", path = "./test/fixtures" }]
 
 [rpc_endpoints]
 sepolia = "${SEPOLIA_RPC_URL}"
+arc_testnet = "${ARC_TESTNET_RPC_URL}"
 
 [etherscan]
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
