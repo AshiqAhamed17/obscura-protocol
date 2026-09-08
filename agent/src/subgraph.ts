@@ -11,12 +11,14 @@ import {
   PINNED_DEPLOYMENT_ID,
   SUBGRAPH_QUERY_URL,
   MAX_STALENESS_SECONDS,
+  OBSCURA_API_KEY,
 } from "./config.js";
 import type { MarketRow } from "./risk.js";
 
 export interface Provenance {
   deploymentId: string;
   endpoint: string;
+  authenticated: boolean;
   blockNumber: number;
   blockTimestamp: number;
   ageSeconds: number;
@@ -64,9 +66,12 @@ export async function fetchGatedSnapshot(opts?: {
 }): Promise<SubgraphSnapshot> {
   const maxStale = opts?.maxStalenessSeconds ?? MAX_STALENESS_SECONDS;
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (OBSCURA_API_KEY) headers["Authorization"] = `Bearer ${OBSCURA_API_KEY}`;
+
   const res = await fetch(SUBGRAPH_QUERY_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ query: QUERY }),
   });
   if (!res.ok) {
@@ -105,6 +110,7 @@ export async function fetchGatedSnapshot(opts?: {
   const provenance: Provenance = {
     deploymentId: meta.deployment,
     endpoint: SUBGRAPH_QUERY_URL,
+    authenticated: OBSCURA_API_KEY.length > 0,
     blockNumber: Number(meta.block.number),
     blockTimestamp,
     ageSeconds,

@@ -69,9 +69,15 @@ Then an agent can call `assess_protocol_risk` and reason over the result.
 
 | Var | Default | Meaning |
 | --- | --- | --- |
+| `OBSCURA_API_KEY` | _(unset)_ | Subgraph Studio API key. When set, the oracle queries Studio **authenticated** ("querying Subgraphs with an API key from Subgraph Studio"). Free tier; keep it out of git. |
 | `OBSCURA_DEPLOYMENT_ID` | `Qmbdew…zcny` | Pinned deployment id the oracle will accept. |
 | `OBSCURA_SUBGRAPH_URL` | Studio v0.0.1 endpoint | Where to read from. |
 | `OBSCURA_MAX_STALENESS` | `900` | Staleness budget in seconds. |
+
+Copy `.env.example` → `.env` (gitignored) and set `OBSCURA_API_KEY`, then e.g.
+`node --env-file=.env node_modules/.bin/tsx src/cli.ts`, or pass it to the MCP
+client: `claude mcp add obscura-risk-oracle -e OBSCURA_API_KEY=<key> -- …`.
+`provenance.authenticated` in every response reflects whether a key was used.
 
 > **Phase-4 note:** when the N-outcome contract is redeployed and the subgraph
 > re-published (v0.0.2), update `OBSCURA_DEPLOYMENT_ID` + `OBSCURA_SUBGRAPH_URL`

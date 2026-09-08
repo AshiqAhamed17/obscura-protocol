@@ -26,17 +26,21 @@ get_solvency_snapshot, get_market_concentration, assess_protocol_risk
 
 ## 2. Agent calls `assess_protocol_risk` (raw MCP `tools/call` response)
 
+The oracle queried Subgraph Studio **authenticated with a Studio API key**
+(`provenance.authenticated: true`).
+
 ```json
 {
   "provenance": {
     "deploymentId": "QmbdewxRjmhSiQHnkYh72Dt3dgrckfe1tiZrREVHymzcny",
     "endpoint": "https://api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.1",
-    "blockNumber": 11660371,
-    "blockTimestamp": 1788861588,
-    "ageSeconds": 8,
+    "authenticated": true,
+    "blockNumber": 11660458,
+    "blockTimestamp": 1788862680,
+    "ageSeconds": 15,
     "maxStalenessSeconds": 900,
     "hasIndexingErrors": false,
-    "checkedAt": 1788861596
+    "checkedAt": 1788862695
   },
   "totals": {
     "marketCount": "8",
@@ -71,9 +75,10 @@ get_solvency_snapshot, get_market_concentration, assess_protocol_risk
 ## 3. Agent reasoning
 
 > **Provenance & freshness first.** The response is anchored to the pinned
-> deployment `Qmbdew…zcny` (matches — not a substituted subgraph), reports no
-> indexing errors, and the head block is **8s old**, well inside the 900s
-> staleness budget. The snapshot is trustworthy; I may reason over it.
+> deployment `Qmbdew…zcny` (matches — not a substituted subgraph), was fetched
+> from Subgraph Studio **authenticated with an API key**, reports no indexing
+> errors, and the head block is **15s old**, well inside the 900s staleness
+> budget. The snapshot is trustworthy; I may reason over it.
 >
 > **Solvency.** 8 markets exist; **0 are settled**, so there are no outstanding
 > obligations to winners yet. Escrow on hand is `0.001 ETH` (1e15 wei) against

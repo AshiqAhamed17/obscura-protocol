@@ -17,3 +17,8 @@ export const SUBGRAPH_QUERY_URL =
 export const MAX_STALENESS_SECONDS = Number(
   process.env.OBSCURA_MAX_STALENESS ?? 900,
 );
+
+// Subgraph Studio API key (created in Studio → API Keys). When set, the oracle
+// queries the Studio endpoint authenticated ("querying Subgraphs with an API key
+// from Subgraph Studio"). Secret — supplied via env only, never committed.
+export const OBSCURA_API_KEY = process.env.OBSCURA_API_KEY ?? "";
