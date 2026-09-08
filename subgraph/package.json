@@ -1,0 +1,18 @@
+{
+  "name": "obscura-subgraph",
+  "version": "0.1.0",
+  "description": "Obscura Protocol subgraph — privacy-first prediction markets on Sepolia",
+  "license": "MIT",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "auth": "graph auth",
+    "deploy": "graph deploy obscura-protocol",
+    "create-local": "graph create --node http://localhost:8020/ obscura-protocol",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 obscura-protocol"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.97.1",
+    "@graphprotocol/graph-ts": "0.38.0"
+  }
+}

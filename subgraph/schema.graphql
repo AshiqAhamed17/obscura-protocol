@@ -1,0 +1,111 @@
+# Obscura Protocol subgraph schema
+#
+# PRIVACY INVARIANT: this subgraph indexes ONLY public / aggregate data plus the
+# shielded primitives that are meant to be public (Poseidon commitments and
+# nullifiers). It NEVER stores a plaintext position — which side/outcome a
+# depositor took is hidden inside the commitment and is not recoverable here.
+# `amount` is the public escrow value (needed for solvency), not a position.
+
+type Market @entity(immutable: false) {
+  "Decimal marketId encoded as bytes"
+  id: Bytes!
+  marketId: BigInt!
+
+  # --- creation params (MarketCreated) ---
+  priceFeed: Bytes!
+  threshold: BigInt!
+  resolveAfter: BigInt!
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+  createdTx: Bytes!
+
+  # --- lifecycle ---
+  "Open | Resolved | Settled"
+  status: String!
+
+  # --- resolution (MarketResolved) ---
+  winningSide: Int
+  resolvedPrice: BigInt
+  resolvedAt: BigInt
+
+  # --- settlement (MarketSettled) — aggregate pool totals only ---
+  merkleRoot: Bytes
+  totalYes: BigInt
+  totalNo: BigInt
+  "Forward-compatible view of per-outcome totals ([No, Yes] on the binary contract)"
+  outcomeTotals: [BigInt!]
+  settledAt: BigInt
+
+  # --- running aggregates over children ---
+  depositCount: BigInt!
+  totalDeposited: BigInt!
+  claimCount: BigInt!
+  totalClaimed: BigInt!
+
+  deposits: [Deposit!]! @derivedFrom(field: "market")
+  claims: [Claim!]! @derivedFrom(field: "market")
+  settlement: Settlement @derivedFrom(field: "market")
+}
+
+"An append-only shielded deposit. Public: commitment (hash), leaf index, escrow amount."
+type Deposit @entity(immutable: true) {
+  id: Bytes!
+  market: Market!
+  "Poseidon commitment to the (hidden) position"
+  commitment: Bytes!
+  leafIndex: BigInt!
+  "Public escrow amount (base units) — NOT a position"
+  amount: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+"Aggregate settlement of a market's pool. One per settled market."
+type Settlement @entity(immutable: false) {
+  id: Bytes!
+  market: Market!
+  merkleRoot: Bytes!
+  totalYes: BigInt!
+  totalNo: BigInt!
+  outcomeTotals: [BigInt!]!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+"An append-only private claim, keyed by its nullifier (spends a note once, unlinkably)."
+type Claim @entity(immutable: true) {
+  id: Bytes!
+  market: Market!
+  "Nullifier — makes double-claims detectable without revealing the note"
+  nullifier: Bytes!
+  recipient: Bytes!
+  payout: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+"Protocol-wide solvency snapshot (singleton id = 'protocol'). Powers the AI solvency/risk agent."
+type ProtocolSolvency @entity(immutable: false) {
+  id: Bytes!
+  marketCount: BigInt!
+  resolvedMarketCount: BigInt!
+  settledMarketCount: BigInt!
+  depositCount: BigInt!
+  claimCount: BigInt!
+
+  "Sum of all escrow deposited across every market"
+  totalDeposited: BigInt!
+  "Sum of all payouts claimed"
+  totalClaimed: BigInt!
+  "Aggregate settled pool totals"
+  totalSettledYes: BigInt!
+  totalSettledNo: BigInt!
+  "Escrow that must still be backed by the protocol = totalDeposited - totalClaimed"
+  outstandingEscrow: BigInt!
+
+  lastUpdatedBlock: BigInt!
+  lastUpdatedAt: BigInt!
+}
