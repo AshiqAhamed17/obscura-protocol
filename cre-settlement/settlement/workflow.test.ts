@@ -9,6 +9,10 @@ const makeConfig = () => ({
 	numOutcomes: 2,
 	positionsSecretId: 'POSITIONS',
 	expectedPool: '6000000',
+	// Empty consumerAddress -> the handler stops at the DON report (no on-chain
+	// write), so the unit tests exercise the confidential aggregation in isolation.
+	consumerAddress: '',
+	chainSelectorName: 'ethereum-testnet-sepolia',
 })
 
 // A binary market's private positions that sum to the 6,000,000 expected pool:

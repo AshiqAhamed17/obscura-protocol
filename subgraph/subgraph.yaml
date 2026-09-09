@@ -10,9 +10,9 @@ dataSources:
     name: PredictionMarket
     network: sepolia
     source:
-      address: "0x3B50a4e83cD1f1AEF171749371A6c25CA07358bD"
+      address: "0x60388bb719F3ccb5a40236076e1AF4B64ed22375"
       abi: PredictionMarket
-      startBlock: 11652891
+      startBlock: 11664680
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -33,7 +33,7 @@ dataSources:
           handler: handleDeposit
         - event: MarketResolved(indexed uint256,uint8,int256)
           handler: handleMarketResolved
-        - event: MarketSettled(indexed uint256,bytes32,uint256,uint256)
+        - event: MarketSettled(indexed uint256,bytes32,uint256[])
           handler: handleMarketSettled
         - event: Claimed(indexed uint256,indexed bytes32,indexed address,uint256)
           handler: handleClaimed

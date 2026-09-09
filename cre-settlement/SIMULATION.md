@@ -45,6 +45,28 @@ cre workflow simulate ./settlement --target staging-settings
 "market 0: solvent=false, totals=[1000000, 2000000]"
 ```
 
+## Run 3 — on-chain delivery path (Task 4.2)
+
+With `consumerAddress` set to the deployed `ConfidentialSettlementConsumer`
+(`0x1E9E464F107246f21f32330311b061A8e340d1b4` on Sepolia) and
+`chainSelectorName: ethereum-testnet-sepolia`, the workflow crosses back to the
+DON and calls `evmClient.writeReport(...)` to deliver the aggregates on-chain:
+
+```
+2026-09-09T06:50:00Z [USER LOG] Enclave settled market 0: 3 private positions -> totals=[1000000, 5000000], pool=6000000, solvent=true
+✓ Workflow Simulation Result:
+"market 0: solvent=true, totals=[1000000, 5000000], tx=0x"
+```
+
+The `writeReport` step runs and returns `TxStatus.SUCCESS` (no throw). The tx hash
+is empty (`0x`) because the **simulator does not broadcast** — on a live
+confidential deployment the DON-signed report would be delivered to the
+consumer's `onReport`. That the report format is wire-compatible with the
+consumer is proven at the contract level: `ConfidentialSettlementConsumer`'s
+`onReport` decodes the exact `(uint64 marketId, uint256[] outcomeTotals, bool
+solvent)` this workflow emits and reconciles it against the SP1-verified totals
+(see `contracts/test/ConfidentialSettlementConsumer.t.sol`).
+
 ## What this demonstrates
 
 - **A real TEE handler runs** — the simulator confirms the trigger requests

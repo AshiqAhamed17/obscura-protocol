@@ -1,9 +1,12 @@
 import {
+	bytesToHex,
 	cre,
+	getNetwork,
 	hexToBase64,
+	TxStatus,
 	type TeeRuntime,
 } from '@chainlink/cre-sdk'
-import { encodeAbiParameters, parseAbiParameters } from 'viem'
+import { type Address, encodeAbiParameters, parseAbiParameters } from 'viem'
 import { z } from 'zod'
 
 // ─── Config Schema ──────────────────────────────────────────
@@ -11,12 +14,19 @@ import { z } from 'zod'
 // positions. `expectedPool` is the publicly-escrowed collateral the private
 // positions must reconcile to (the solvency target). Both are the market's
 // public parameters — only the positions themselves are confidential.
+//
+// `consumerAddress` + `chainSelectorName` wire the on-chain leg (Task 4.2): when
+// set, the DON-signed report of the aggregates is delivered to the
+// `ConfidentialSettlementConsumer` on that chain. Left empty, the workflow stops
+// at the DON report (pure confidential aggregation, still fully simulatable).
 export const configSchema = z.object({
 	schedule: z.string(),
 	marketId: z.number().int().nonnegative(),
 	numOutcomes: z.number().int().min(2),
 	positionsSecretId: z.string(),
 	expectedPool: z.string(), // decimal string of USDC base units (6-dec); string avoids float loss
+	consumerAddress: z.string().optional().default(''),
+	chainSelectorName: z.string().optional().default('ethereum-testnet-sepolia'),
 })
 type Config = z.infer<typeof configSchema>
 
@@ -113,7 +123,7 @@ export const onSettlementTrigger = (runtime: TeeRuntime<Config>): string => {
 		[BigInt(config.marketId), outcomeTotals, solvent],
 	)
 
-	donRuntime
+	const signedReport = donRuntime
 		.report({
 			encodedPayload: hexToBase64(encodedPayload),
 			encoderName: 'evm',
@@ -122,12 +132,35 @@ export const onSettlementTrigger = (runtime: TeeRuntime<Config>): string => {
 		})
 		.result()
 
-	// The DON-signed report carries only the aggregate settlement totals. On-chain,
-	// the escrow still requires the SP1 proof to verify these totals are correct +
-	// solvent before releasing funds — confidentiality (this enclave) AND
-	// verifiability (SP1) together. To deliver on-chain, pass the report to
-	// `evmClient.writeReport(donRuntime, report)` (Task 4.2).
-	return `market ${config.marketId}: solvent=${solvent}, totals=[${outcomeTotals.join(', ')}]`
+	// ── Step 5: Deliver the report on-chain (confidential → verifiable → chain) ──
+	// Chain writes are never in-enclave — this runs on the DON. The DON-signed
+	// report carries ONLY the aggregate totals; it lands in
+	// `ConfidentialSettlementConsumer.onReport`, which reconciles it against the
+	// SP1-verified totals the escrow proved on-chain. Fund release stays gated by
+	// the SP1 proof in `PredictionMarket` — confidentiality (this enclave) AND
+	// verifiability (SP1) together.
+	let txHash = ''
+	if (config.consumerAddress !== '') {
+		const network = getNetwork({ chainFamily: 'evm', chainSelectorName: config.chainSelectorName })
+		if (!network) throw new Error(`unknown chain selector: ${config.chainSelectorName}`)
+
+		const evmClient = new cre.capabilities.EVMClient(network.chainSelector.selector)
+		const tx = evmClient
+			.writeReport(donRuntime, {
+				receiver: config.consumerAddress as Address,
+				report: signedReport,
+				gasConfig: { gasLimit: '500000' },
+			})
+			.result()
+
+		if (tx.txStatus !== TxStatus.SUCCESS) {
+			throw new Error(`on-chain settlement write failed: status=${tx.txStatus}`)
+		}
+		txHash = bytesToHex(tx.txHash ?? new Uint8Array())
+	}
+
+	const delivered = txHash !== '' ? `, tx=${txHash}` : ''
+	return `market ${config.marketId}: solvent=${solvent}, totals=[${outcomeTotals.join(', ')}]${delivered}`
 }
 
 // ─── Workflow Init ──────────────────────────────────────────

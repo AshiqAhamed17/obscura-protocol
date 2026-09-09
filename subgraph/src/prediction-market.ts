@@ -99,7 +99,7 @@ export function handleDeposit(event: DepositEvent): void {
 export function handleMarketResolved(event: MarketResolved): void {
   let market = Market.load(marketPk(event.params.marketId))
   if (market == null) return
-  market.winningSide = event.params.winningSide
+  market.winningSide = event.params.winningOutcome
   market.resolvedPrice = event.params.resolvedPrice
   market.resolvedAt = event.block.timestamp
   market.status = "Resolved"
@@ -111,13 +111,17 @@ export function handleMarketResolved(event: MarketResolved): void {
 }
 
 export function handleMarketSettled(event: MarketSettled): void {
-  let totals: BigInt[] = [event.params.totalNo, event.params.totalYes]
+  // N-outcome contract: `outcomeTotals` is the full per-outcome array. For a
+  // binary market it is [No, Yes]; totalNo/totalYes stay as convenient views.
+  let totals: BigInt[] = event.params.outcomeTotals
+  let totalNo: BigInt = totals.length > 0 ? totals[0] : BigInt.zero()
+  let totalYes: BigInt = totals.length > 1 ? totals[1] : BigInt.zero()
 
   let settlement = new Settlement(marketPk(event.params.marketId))
   settlement.market = marketPk(event.params.marketId)
   settlement.merkleRoot = event.params.merkleRoot
-  settlement.totalYes = event.params.totalYes
-  settlement.totalNo = event.params.totalNo
+  settlement.totalYes = totalYes
+  settlement.totalNo = totalNo
   settlement.outcomeTotals = totals
   settlement.timestamp = event.block.timestamp
   settlement.blockNumber = event.block.number
@@ -127,8 +131,8 @@ export function handleMarketSettled(event: MarketSettled): void {
   let market = Market.load(marketPk(event.params.marketId))
   if (market != null) {
     market.merkleRoot = event.params.merkleRoot
-    market.totalYes = event.params.totalYes
-    market.totalNo = event.params.totalNo
+    market.totalYes = totalYes
+    market.totalNo = totalNo
     market.outcomeTotals = totals
     market.settledAt = event.block.timestamp
     market.status = "Settled"
@@ -137,8 +141,8 @@ export function handleMarketSettled(event: MarketSettled): void {
 
   let p = loadProtocol()
   p.settledMarketCount = p.settledMarketCount.plus(BigInt.fromI32(1))
-  p.totalSettledYes = p.totalSettledYes.plus(event.params.totalYes)
-  p.totalSettledNo = p.totalSettledNo.plus(event.params.totalNo)
+  p.totalSettledYes = p.totalSettledYes.plus(totalYes)
+  p.totalSettledNo = p.totalSettledNo.plus(totalNo)
   touchProtocol(p, event)
 }
 

@@ -13,16 +13,17 @@ a position. Only commitments, nullifiers, and aggregate pool totals are stored.
 
 ## Deployment
 
-- **Contract:** `PredictionMarket` @ `0x3B50a4e83cD1f1AEF171749371A6c25CA07358bD` (Sepolia)
-- **Start block:** `11652891` (contract creation)
+- **Contract:** `PredictionMarket` @ `0x60388bb719F3ccb5a40236076e1AF4B64ed22375` (Sepolia)
+- **Start block:** `11664680` (contract creation)
 - **Studio dashboard:** https://thegraph.com/studio/subgraph/obscura-protocol
-- **Query endpoint (v0.0.1):** `https://api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.1`
-- **Deployment ID:** `QmbdewxRjmhSiQHnkYh72Dt3dgrckfe1tiZrREVHymzcny`
+- **Query endpoint (v0.0.2):** `https://api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.2`
+- **Deployment ID:** `QmRVbZNT9mDmJxez7VnhARRgF52nfdTy8KjoiJQmGmYcf3`
 
-> The live contract is the **binary baseline** (deployed before the categorical /
-> N-outcome refactor), so `MarketSettled` carries `totalYes` / `totalNo`. The
-> schema exposes a forward-compatible `outcomeTotals: [BigInt!]` so the Phase-4
-> N-outcome redeploy is a manifest re-point, not a schema rewrite.
+> **v0.0.2 (Phase 4 re-point):** indexes the N-outcome/categorical, USDC-denominated
+> redeploy. `MarketSettled` now carries the per-outcome `uint256[] outcomeTotals`
+> array (binary = `[No, Yes]`); the schema already exposed `outcomeTotals: [BigInt!]`,
+> so this was a manifest + handler re-point, not a schema rewrite. The prior v0.0.1
+> indexed the binary baseline at `0x3B50a4e8…`.
 
 ## Entities
 

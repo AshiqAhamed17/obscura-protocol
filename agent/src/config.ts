@@ -7,11 +7,11 @@
 
 export const PINNED_DEPLOYMENT_ID =
   process.env.OBSCURA_DEPLOYMENT_ID ??
-  "QmbdewxRjmhSiQHnkYh72Dt3dgrckfe1tiZrREVHymzcny";
+  "QmRVbZNT9mDmJxez7VnhARRgF52nfdTy8KjoiJQmGmYcf3";
 
 export const SUBGRAPH_QUERY_URL =
   process.env.OBSCURA_SUBGRAPH_URL ??
-  "https://api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.1";
+  "https://api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.2";
 
 // A snapshot older than this (in seconds) is treated as stale and refused.
 export const MAX_STALENESS_SECONDS = Number(

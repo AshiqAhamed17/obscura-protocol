@@ -1,30 +1,43 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
+  "deploymentBlock": 11664680,
   "contracts": {
     "PredictionMarket": {
-      "address": "0x3B50a4e83cD1f1AEF171749371A6c25CA07358bD",
+      "address": "0x60388bb719F3ccb5a40236076e1AF4B64ed22375",
       "verified": true,
-      "explorer": "https://sepolia.etherscan.io/address/0x3B50a4e83cD1f1AEF171749371A6c25CA07358bD"
+      "explorer": "https://sepolia.etherscan.io/address/0x60388bb719F3ccb5a40236076e1AF4B64ed22375"
     },
     "HonkVerifier": {
-      "address": "0xd93A71bDeE0BFe026B6e132c5c99949c9bfE0dF7",
+      "address": "0x57C24427795E3b22D0E448C252E04ACb6711949D",
       "verified": true,
-      "explorer": "https://sepolia.etherscan.io/address/0xd93A71bDeE0BFe026B6e132c5c99949c9bfE0dF7"
+      "explorer": "https://sepolia.etherscan.io/address/0x57C24427795E3b22D0E448C252E04ACb6711949D"
+    },
+    "ForesightVerifier": {
+      "address": "0x556e642F9367913814784F927DAF3F3d91a7aEA5",
+      "explorer": "https://sepolia.etherscan.io/address/0x556e642F9367913814784F927DAF3F3d91a7aEA5"
+    },
+    "ForesightRegistry": {
+      "address": "0x6d6B0dD2f40BCA7658237dD0F0c9527a068DaF97",
+      "explorer": "https://sepolia.etherscan.io/address/0x6d6B0dD2f40BCA7658237dD0F0c9527a068DaF97"
+    },
+    "ConfidentialSettlementConsumer": {
+      "address": "0x1E9E464F107246f21f32330311b061A8e340d1b4",
+      "verified": true,
+      "explorer": "https://sepolia.etherscan.io/address/0x1E9E464F107246f21f32330311b061A8e340d1b4"
     }
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
-  "chainlinkEthUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
-  "programVKey": "0x00ea0a2fb0d74f55499c4bab306d578547ffa6ded22f3ac080f5b0128f292f82",
-  "deployedProgramVKey": "0x002ee7dad16e6f740bf442812c70651fc13603e07008447a52d323260cad5f98",
-  "deploymentStatus": "The live PredictionMarket/HonkVerifier above are the BINARY baseline (deployed before the categorical/N-outcome refactor). The repo's contract + circuit are now N-outcome; `programVKey` is the NEW guest key. A single redeploy (new verifier + this vkey) is bundled into Phase 4 (CRE). The categorical logic is fully proven locally: 40 Foundry + 17 Rust + 28 Noir tests, incl. a 3-outcome settle+payout and a real-verifier claim E2E.",
-  "seededMarkets": {
-    "1": "ETH/USD > $3,000 (crypto)",
-    "2": "BTC/USD > $100,000 (crypto)",
-    "3": "LINK/USD > $15 (crypto)",
-    "4": "XAU/USD > $4,500 (gold / commodity)",
-    "5": "EUR/USD > 1.15 (forex)"
+  "keystoneForwarder": "0xF8344CFd5c43616a4366C34E3EEE75af79a74482",
+  "collateral": {
+    "symbol": "USDC",
+    "address": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "decimals": 6,
+    "note": "Circle-issued USDC on Ethereum Sepolia (6 decimals)."
   },
+  "programVKey": "0x00ea0a2fb0d74f55499c4bab306d578547ffa6ded22f3ac080f5b0128f292f82",
+  "deployedProgramVKey": "0x00ea0a2fb0d74f55499c4bab306d578547ffa6ded22f3ac080f5b0128f292f82",
+  "chainlinkEthUsdFeed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
   "verifiedFeeds": {
     "ETH_USD": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
     "BTC_USD": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43",
@@ -32,5 +45,6 @@
     "XAU_USD": "0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea",
     "EUR_USD": "0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910"
   },
-  "notes": "Real programVKey wired in (not a placeholder) - settleWithProof is live. A diverse board of price-threshold markets (crypto/gold/forex) is seeded via script/CreateMarkets.s.sol; each feed was verified live and non-stale on-chain (dead JPY and stale GBP/DAI feeds excluded). Multi-feed resolution proven on-chain across ETH (No), BTC (Yes), and gold (No). Settlement requires a network-generated SP1 proof (--evm on the Succinct Prover Network)."
+  "deployer": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308",
+  "notes": "Phase-4 redeploy (2026-09-09): the canonical Sepolia stack is now the N-outcome/categorical PredictionMarket (real programVKey 0x00ea..., settleWithProof live), USDC-denominated (ERC-20 approve/transferFrom + EIP-2612 permit), plus the ForesightRegistry and the ConfidentialSettlementConsumer that receives the Chainlink CRE confidential settlement report and reconciles it against the SP1-verified totals. Replaces the pre-categorical BINARY baseline at 0x3B50a4e8... The subgraph is re-pointed to this address as v0.0.2. 54 Foundry + 17 Rust + 37 Noir tests green."
 }

@@ -69,8 +69,22 @@ cre workflow simulate ./settlement --target staging-settings
 and asserted to appear in *nothing* that crosses the enclave boundary (report or
 logs) — only the aggregate outcome total does.
 
-## Next (Task 4.2)
+## On-chain wiring (Task 4.2 — done)
 
-Wire the DON-signed report on-chain: `evmClient.writeReport(donRuntime, report)`
-to Sepolia, where the escrow verifies the SP1 proof of these same totals before
-unlocking claims — completing confidential → verifiable → on-chain.
+When `consumerAddress` is set, the handler crosses back to the DON and calls
+`evmClient.writeReport(...)` to deliver the aggregates to the
+**`ConfidentialSettlementConsumer`** on Sepolia
+(`0x1E9E464F107246f21f32330311b061A8e340d1b4`). That contract decodes the exact
+`(uint64 marketId, uint256[] outcomeTotals, bool solvent)` this workflow emits and
+**reconciles it against the SP1-verified on-chain totals** — the on-chain evidence
+that the two settlement legs agree:
+
+- **confidentiality** — this CRE TEE (operators never see individual positions)
+- **verifiability** — `PredictionMarket.settleWithProof` (the SP1 proof), which
+  remains the gate that unlocks claims.
+
+Confidential-workflow *deployment* needs private-beta enrollment, so the on-chain
+write is exercised in simulation (returns `TxStatus.SUCCESS`; the simulator does
+not broadcast). The contract-level wire-compatibility + reconciliation is proven
+by `contracts/test/ConfidentialSettlementConsumer.t.sol` (7 tests). See
+`SIMULATION.md` Run 3.

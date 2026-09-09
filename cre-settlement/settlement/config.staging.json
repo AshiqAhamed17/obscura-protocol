@@ -3,5 +3,7 @@
   "marketId": 0,
   "numOutcomes": 2,
   "positionsSecretId": "POSITIONS",
-  "expectedPool": "6000000"
+  "expectedPool": "6000000",
+  "consumerAddress": "0x1E9E464F107246f21f32330311b061A8e340d1b4",
+  "chainSelectorName": "ethereum-testnet-sepolia"
 }
