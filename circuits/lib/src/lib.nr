@@ -14,7 +14,7 @@ pub mod note;
 pub mod merkle;
 
 pub use merkle::{MerkleProof, MERKLE_DEPTH};
-pub use note::Note;
+pub use note::{Note, ParlayNote, PARLAY_LEGS};
 
 /// Composition check: a note's commitment (1.2) is what gets proven as a
 /// Merkle member (1.3). This is exactly the deposit → claim linkage the claim

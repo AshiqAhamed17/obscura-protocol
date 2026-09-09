@@ -1,0 +1,7 @@
+[package]
+name = "parlay"
+type = "bin"
+authors = ["Ashiq Ahamed"]
+
+[dependencies]
+obscura = { path = "../lib" }

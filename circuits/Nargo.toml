@@ -1,2 +1,2 @@
 [workspace]
-members = ["lib", "claim", "foresight", "fixture_gen"]
+members = ["lib", "claim", "foresight", "parlay", "fixture_gen", "parlay_fixture"]

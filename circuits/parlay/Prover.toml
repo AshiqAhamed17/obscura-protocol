@@ -1,0 +1,15 @@
+# E2E fixture witness for the parlay Foundry test. Derived values (parlay_root,
+# nullifier) come from `nargo execute --package parlay_fixture`. recipient =
+# 0xCAFEBABE (= 3405691582). Regenerate the proof with ../generate-parlay.sh
+# after any change here.
+parlay_root = "0x2d5f1fe32fa69ffe9c09f337fea1e8d061e86fbd35f41da5a0c5aadfc54629b3"
+market_ids = ["5", "8", "13"]
+winning_outcomes = ["1", "0", "2"]
+amount = "1000000"
+nullifier = "0x08b733c7b4579b956eada50f83b62cff35e98295e6a8488253c9c733ace6b324"
+recipient = "3405691582"
+outcomes = ["1", "0", "2"]
+secret = "111111"
+nullifier_secret = "222222"
+path_indices = ["0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
+path_siblings = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
