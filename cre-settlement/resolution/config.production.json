@@ -1,0 +1,9 @@
+{
+  "schedule": "0 */5 * * * *",
+  "marketId": 3,
+  "subgraphUrl": "https://api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.2",
+  "graphQuery": "{ protocolSolvencies(first: 1) { marketCount } }",
+  "threshold": 3,
+  "consumerAddress": "",
+  "chainSelectorName": "ethereum-testnet-sepolia"
+}

@@ -25,6 +25,12 @@
       "address": "0x1E9E464F107246f21f32330311b061A8e340d1b4",
       "verified": true,
       "explorer": "https://sepolia.etherscan.io/address/0x1E9E464F107246f21f32330311b061A8e340d1b4"
+    },
+    "CreResolutionConsumer": {
+      "address": "0x4ae8FF6f6D1957fCb72cb2002223c04Fd64235F3",
+      "verified": true,
+      "explorer": "https://sepolia.etherscan.io/address/0x4ae8FF6f6D1957fCb72cb2002223c04Fd64235F3",
+      "note": "Task 4.3 — CRE Graph-query resolver. Registered as the resolver for market 3 (SourceType.GraphQuery). A CRE workflow reads the subgraph metric and the DON delivers the outcome here, which calls reportResolution."
     }
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
