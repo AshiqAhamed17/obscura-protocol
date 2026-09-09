@@ -81,6 +81,19 @@ pub global PARLAY_LEGS: u32 = 3;
 /// nullifier never collides with a single-market spend/foresight nullifier.
 pub global PARLAY_DOMAIN: Field = 0x7061726c617900000000000000000000000000000000000000000000;
 
+/// Domain-separation constant for the reputation badge nullifier, so an
+/// anonymous forecasting-reputation credential lives in its own registry and
+/// cannot be linked to any spend/foresight/parlay nullifier.
+pub global REPUTATION_DOMAIN: Field = 0x726570757461746900000000000000000000000000000000000000;
+
+/// The reputation badge nullifier for a forecaster, revealed once when they
+/// mint a reputation credential. Bound to a `forecaster_secret` the holder keeps
+/// (so the badge registers a single time) and domain-separated so it is
+/// unlinkable to any spend/foresight/parlay nullifier.
+pub fn reputation_nullifier(forecaster_secret: Field) -> Field {
+    poseidon::poseidon::bn254::hash_2([forecaster_secret, REPUTATION_DOMAIN])
+}
+
 /// A shielded **parlay**: a single private position that wins only if EVERY leg
 /// resolves to its committed outcome. Each leg is a `(market_id, outcome)` pick;
 /// the whole parlay shares one stake, one blinding secret, and one nullifier —
