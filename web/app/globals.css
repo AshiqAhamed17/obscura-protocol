@@ -735,6 +735,31 @@ main,
   border-color: rgba(255, 206, 159, 0.35);
 }
 
+/* multi-chain wallet cluster + network switcher */
+.wallet-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.net-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  padding: 0.4rem 0.7rem;
+}
+.net-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.net-caption {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  margin: 0 0 0.9rem;
+}
+
 /* price gauge (live Chainlink price vs threshold) */
 .gauge {
   margin-top: 1.1rem;

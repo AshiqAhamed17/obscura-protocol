@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract, useAccount } from "wagmi";
+import { useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract, useAccount, useChainId } from "wagmi";
 import {
   abi,
-  PREDICTION_MARKET,
+  contractsFor,
   ResolutionSource,
   resolutionLabel,
   feedLabel,
@@ -41,9 +41,12 @@ function marketTitle(m: Market, source: number): string {
 }
 
 export function MarketList() {
+  const chainId = useChainId();
+  const { predictionMarket, label: netLabel } = contractsFor(chainId);
+
   const { data: count, isLoading } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "marketCount",
   });
   const n = Number(count ?? 0n);
@@ -51,7 +54,7 @@ export function MarketList() {
   const { data: raw } = useReadContracts({
     contracts: Array.from({ length: n }, (_, i) => ({
       abi,
-      address: PREDICTION_MARKET,
+      address: predictionMarket,
       functionName: "markets" as const,
       args: [BigInt(i)] as const,
     })),
@@ -61,7 +64,7 @@ export function MarketList() {
   const { data: sources } = useReadContracts({
     contracts: Array.from({ length: n }, (_, i) => ({
       abi,
-      address: PREDICTION_MARKET,
+      address: predictionMarket,
       functionName: "resolutionConfig" as const,
       args: [BigInt(i)] as const,
     })),
@@ -115,11 +118,12 @@ export function MarketList() {
     return arr;
   }, [rows, filter, sort, featured]);
 
-  if (isLoading) return <p className="muted mono">Loading markets…</p>;
-  if (n === 0) return <p className="muted">No markets yet — check back soon.</p>;
+  if (isLoading) return <p className="muted mono">Loading markets on {netLabel}…</p>;
+  if (n === 0) return <p className="muted">No markets on {netLabel} yet — switch network or check back soon.</p>;
 
   return (
     <>
+      <p className="net-caption mono">On {netLabel}</p>
       <div className="statrow">
         <Stat label="Markets" value={String(stats.total)} />
         <Stat label="Open now" value={String(stats.open)} />
@@ -250,6 +254,8 @@ function FeaturedMarket({ id, m, source }: Row) {
 
 function MarketCard({ id, m, source, index }: Row & { index: number }) {
   const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const { predictionMarket, explorer } = contractsFor(chainId);
   const isFeed = source === ResolutionSource.ChainlinkFeed;
 
   const px = useMotionValue(0);
@@ -271,7 +277,7 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
 
   const { writeContract, data: hash, isPending, error } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-  const { refetch } = useReadContract({ abi, address: PREDICTION_MARKET, functionName: "markets", args: [id], query: { enabled: false } });
+  const { refetch } = useReadContract({ abi, address: predictionMarket, functionName: "markets", args: [id], query: { enabled: false } });
 
   useEffect(() => {
     if (isSuccess) refetch();
@@ -341,7 +347,7 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
           <button
             className="btn sm"
             disabled={!isConnected || !resolvable || isPending || confirming}
-            onClick={() => writeContract({ abi, address: PREDICTION_MARKET, functionName: "resolveMarket", args: [id] })}
+            onClick={() => writeContract({ abi, address: predictionMarket, functionName: "resolveMarket", args: [id] })}
             title={resolvable ? "Read Chainlink and set the outcome" : "Resolves later"}
           >
             {isPending ? "Confirm…" : confirming ? "Resolving…" : resolvable ? "Resolve" : "Locked"}
@@ -363,7 +369,7 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
       {isSuccess && (
         <p className="card-note tag-yes">
           Resolved ✓{" "}
-          <a href={`https://sepolia.etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
+          <a href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
             view tx ↗
           </a>
         </p>

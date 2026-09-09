@@ -4,13 +4,12 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import {
   abi,
   erc20Abi,
-  PREDICTION_MARKET,
+  contractsFor,
   Side,
-  USDC,
   USDC_DECIMALS,
   parseMarket,
   feedLabel,
@@ -48,15 +47,17 @@ export default function DepositPage() {
 function DepositForm() {
   const params = useSearchParams();
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { predictionMarket, usdc: usdcAddr, explorer } = contractsFor(chainId);
   const [marketId, setMarketId] = useState<string>(params.get("market") ?? "0");
   const [side, setSide] = useState<Side>(Side.Yes);
   const [amount, setAmount] = useState("5");
   const [savedNote, setSavedNote] = useState<Note | null>(null);
 
-  const { data: count } = useReadContract({ abi, address: PREDICTION_MARKET, functionName: "marketCount" });
+  const { data: count } = useReadContract({ abi, address: predictionMarket, functionName: "marketCount" });
   const { data: marketData } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "markets",
     args: [BigInt(marketId || "0")],
   });
@@ -64,16 +65,16 @@ function DepositForm() {
 
   const { data: usdcBalance } = useReadContract({
     abi: erc20Abi,
-    address: USDC,
+    address: usdcAddr,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: { enabled: !!address },
   });
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     abi: erc20Abi,
-    address: USDC,
+    address: usdcAddr,
     functionName: "allowance",
-    args: address ? [address, PREDICTION_MARKET] : undefined,
+    args: address ? [address, predictionMarket] : undefined,
     query: { enabled: !!address },
   });
 
@@ -121,7 +122,7 @@ function DepositForm() {
   const needsApproval = (allowance as bigint | undefined ?? 0n) < amountBase;
 
   function approve() {
-    writeApprove({ abi: erc20Abi, address: USDC, functionName: "approve", args: [PREDICTION_MARKET, amountBase] });
+    writeApprove({ abi: erc20Abi, address: usdcAddr, functionName: "approve", args: [predictionMarket, amountBase] });
   }
 
   function submit() {
@@ -130,7 +131,7 @@ function DepositForm() {
     setSavedNote(null);
     writeContract({
       abi,
-      address: PREDICTION_MARKET,
+      address: predictionMarket,
       functionName: "deposit",
       args: [pendingNote.marketId, commitment(pendingNote), pendingNote.amount],
     });
@@ -285,6 +286,7 @@ function MarketContext({ market }: { market: Market }) {
 
 function NoteBackup({ note, hash }: { note: Note; hash?: `0x${string}` }) {
   const [copied, setCopied] = useState(false);
+  const { explorer } = contractsFor(useChainId());
   const backup = JSON.stringify(
     {
       marketId: note.marketId.toString(),
@@ -304,7 +306,7 @@ function NoteBackup({ note, hash }: { note: Note; hash?: `0x${string}` }) {
           {hash && (
             <>
               {" "}
-              <a href={`https://sepolia.etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer">
+              <a href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer">
                 View tx ↗
               </a>
             </>

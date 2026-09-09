@@ -1,17 +1,50 @@
 import { parseAbi } from "viem";
-import { sepolia } from "wagmi/chains";
+import { sepolia, arcTestnet } from "wagmi/chains";
 
-/// Canonical Sepolia deployment (see contracts/deployments/sepolia.json).
-/// Phase-4 redeploy: N-outcome / categorical, USDC-denominated.
-export const PREDICTION_MARKET = "0x60388bb719F3ccb5a40236076e1AF4B64ed22375" as const;
+/// Per-chain deployment. Obscura runs on two chains: Ethereum Sepolia (the
+/// canonical, Chainlink-feed + SP1-settled deployment) and Circle's Arc testnet
+/// (USDC-native, no Chainlink feeds — markets resolve via CRE/resolver).
+export interface ChainDeployment {
+  label: string;
+  predictionMarket: `0x${string}`;
+  usdc: `0x${string}`;
+  explorer: string;
+  hasFeeds: boolean;
+}
+
+export const CHAINS: Record<number, ChainDeployment> = {
+  [sepolia.id]: {
+    label: "Sepolia",
+    predictionMarket: "0x60388bb719F3ccb5a40236076e1AF4B64ed22375",
+    usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    explorer: "https://sepolia.etherscan.io",
+    hasFeeds: true,
+  },
+  [arcTestnet.id]: {
+    label: "Arc",
+    predictionMarket: "0xB0bAF72EC2a249376B468B5E6Bbc88CF87099b50",
+    usdc: "0x3600000000000000000000000000000000000000",
+    explorer: "https://testnet.arcscan.app",
+    hasFeeds: false,
+  },
+};
+
+export const SUPPORTED_CHAINS = [sepolia, arcTestnet];
+
+/// Active deployment for the connected chain (defaults to Sepolia).
+export function contractsFor(chainId: number | undefined): ChainDeployment {
+  return (chainId !== undefined && CHAINS[chainId]) || CHAINS[sepolia.id];
+}
+
+/// Sepolia defaults (used by the nav ETH ticker, which reads the Sepolia feed).
+export const PREDICTION_MARKET = CHAINS[sepolia.id].predictionMarket;
+export const USDC = CHAINS[sepolia.id].usdc;
+export const USDC_DECIMALS = 6;
+
 export const CONFIDENTIAL_CONSUMER = "0x1E9E464F107246f21f32330311b061A8e340d1b4" as const;
 export const RESOLUTION_CONSUMER = "0x4ae8FF6f6D1957fCb72cb2002223c04Fd64235F3" as const;
 export const FORESIGHT_REGISTRY = "0x6d6B0dD2f40BCA7658237dD0F0c9527a068DaF97" as const;
 export const CHAIN = sepolia;
-
-/// USDC on Ethereum Sepolia (Circle-issued, 6 decimals) — the escrow collateral.
-export const USDC = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as const;
-export const USDC_DECIMALS = 6;
 
 /// The Obscura subgraph (Studio v0.0.2) — powers aggregate market data.
 export const SUBGRAPH_URL =

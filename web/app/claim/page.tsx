@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { abi, PREDICTION_MARKET, feedLabel, parseMarket, type MarketTuple } from "@/lib/contract";
+import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { abi, contractsFor, feedLabel, parseMarket, type MarketTuple } from "@/lib/contract";
 import { commitment, loadNotes, nullifier, storedToNote, type Note } from "@/lib/note";
 import { generateClaimProof } from "@/lib/prove";
 import { usdc, outcomeLabel, statusLabel, usd } from "@/lib/format";
@@ -91,6 +91,8 @@ export default function ClaimPage() {
 }
 
 function ClaimForm({ note, recipient }: { note: Note; recipient: `0x${string}` }) {
+  const chainId = useChainId();
+  const { predictionMarket, explorer } = contractsFor(chainId);
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [proving, setProving] = useState(false);
@@ -98,26 +100,26 @@ function ClaimForm({ note, recipient }: { note: Note; recipient: `0x${string}` }
 
   const { data: marketData } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "markets",
     args: [note.marketId],
   });
   const { data: leavesData } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "getCommitments",
     args: [note.marketId],
   });
   const { data: outcomeTotalsData } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "getOutcomeTotals",
     args: [note.marketId],
   });
   const nul = useMemo(() => nullifier(note), [note]);
   const { data: spent } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "nullifierSpent",
     args: [nul],
   });
@@ -163,7 +165,7 @@ function ClaimForm({ note, recipient }: { note: Note; recipient: `0x${string}` }
       setStatus("Submitting claim…");
       writeContract({
         abi,
-        address: PREDICTION_MARKET,
+        address: predictionMarket,
         functionName: "claim",
         args: [note.marketId, cp.amount, cp.nullifier, cp.recipient, cp.proof],
       });
@@ -214,7 +216,7 @@ function ClaimForm({ note, recipient }: { note: Note; recipient: `0x${string}` }
         <div className="note ok">
           Claim confirmed — payout sent to {payoutAddr.slice(0, 6)}…{payoutAddr.slice(-4)}.{" "}
           {hash && (
-            <a href={`https://sepolia.etherscan.io/tx/${hash}`} target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
+            <a href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
               View tx ↗
             </a>
           )}

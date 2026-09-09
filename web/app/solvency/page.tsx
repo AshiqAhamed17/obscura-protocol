@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReadContract, useReadContracts } from "wagmi";
-import { abi, PREDICTION_MARKET, feedLabel, parseMarket, type Market, type MarketTuple } from "@/lib/contract";
+import { useChainId, useReadContract, useReadContracts } from "wagmi";
+import { abi, contractsFor, feedLabel, parseMarket, type Market, type MarketTuple } from "@/lib/contract";
 import { usdc, usdcCompact, outcomeLabel, statusClass, statusLabel, usd } from "@/lib/format";
 import { AmbientField } from "@/components/AmbientField";
 
 type Row = { id: bigint; m: Market; totals: readonly bigint[] };
 
 export default function SolvencyPage() {
+  const chainId = useChainId();
+  const { predictionMarket } = contractsFor(chainId);
   const { data: count, isLoading } = useReadContract({
     abi,
-    address: PREDICTION_MARKET,
+    address: predictionMarket,
     functionName: "marketCount",
   });
   const n = Number(count ?? 0n);
@@ -19,7 +21,7 @@ export default function SolvencyPage() {
   const { data: raw } = useReadContracts({
     contracts: Array.from({ length: n }, (_, i) => ({
       abi,
-      address: PREDICTION_MARKET,
+      address: predictionMarket,
       functionName: "markets" as const,
       args: [BigInt(i)] as const,
     })),
@@ -29,7 +31,7 @@ export default function SolvencyPage() {
   const { data: totalsRaw } = useReadContracts({
     contracts: Array.from({ length: n }, (_, i) => ({
       abi,
-      address: PREDICTION_MARKET,
+      address: predictionMarket,
       functionName: "getOutcomeTotals" as const,
       args: [BigInt(i)] as const,
     })),
