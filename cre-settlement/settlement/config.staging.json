@@ -1,0 +1,7 @@
+{
+  "schedule": "0 */1 * * * *",
+  "marketId": 0,
+  "numOutcomes": 2,
+  "positionsSecretId": "POSITIONS",
+  "expectedPool": "6000000"
+}
