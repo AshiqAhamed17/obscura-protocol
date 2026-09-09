@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#5a5a66"/>
+    </marker>
+    <marker id="arg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#8fe6cb"/>
+    </marker>
+    <style>
+      .t{fill:#ededf0;font-size:13px;font-weight:600}
+      .s{fill:#9a9aa6;font-size:11px}
+      .lane{fill:#6b9bff;font-size:11px;letter-spacing:.14em}
+      .laneg{fill:#8fe6cb;font-size:11px;letter-spacing:.14em}
+      .bt{fill:#f2f2f5;font-size:12px}
+      .bs{fill:#8f8f99;font-size:10.5px}
+      .box{fill:#131316;stroke:#2a2a30;rx:10}
+      .arrow{stroke:#5a5a66;stroke-width:1.4;fill:none}
+    </style>
+  </defs>
+  <rect width="960" height="470" fill="#0a0a0c"/>
+  <text x="30" y="42" class="t" font-size="18">Chainlink CRE — Confidential + Verifiable Settlement</text>
+  <text x="30" y="66" class="s">Operators never see individual positions (TEE); the SP1 proof makes the settlement trustlessly correct. Keep both.</text>
+
+  <!-- Confidentiality lane -->
+  <text x="30" y="104" class="lane">CONFIDENTIALITY · AWS NITRO TEE (us-west-2)</text>
+  <g>
+    <rect x="30" y="116" width="200" height="78" class="box" rx="10"/>
+    <text x="130" y="150" text-anchor="middle" class="bt">Private positions</text>
+    <text x="130" y="168" text-anchor="middle" class="bs">Vault-DON secret</text>
+
+    <rect x="268" y="116" width="200" height="78" rx="10" fill="#101a17" stroke="#2c4a40"/>
+    <text x="368" y="144" text-anchor="middle" class="bt">CRE handlerInTee</text>
+    <text x="368" y="162" text-anchor="middle" class="bs">Σ per-outcome totals</text>
+    <text x="368" y="178" text-anchor="middle" class="bs">+ solvency check</text>
+
+    <rect x="506" y="116" width="200" height="78" class="box" rx="10"/>
+    <text x="606" y="150" text-anchor="middle" class="bt">DON-signed report</text>
+    <text x="606" y="168" text-anchor="middle" class="bs">aggregates only</text>
+
+    <rect x="744" y="116" width="200" height="78" class="box" rx="10"/>
+    <text x="844" y="144" text-anchor="middle" class="bt">Confidential</text>
+    <text x="844" y="160" text-anchor="middle" class="bt">Consumer</text>
+    <text x="844" y="178" text-anchor="middle" class="bs">Sepolia · onReport</text>
+
+    <line x1="230" y1="155" x2="266" y2="155" class="arrow" marker-end="url(#ar)"/>
+    <line x1="468" y1="155" x2="504" y2="155" class="arrow" marker-end="url(#ar)"/>
+    <line x1="706" y1="155" x2="742" y2="155" class="arrow" marker-end="url(#ar)"/>
+  </g>
+
+  <!-- Verifiability lane -->
+  <text x="30" y="286" class="laneg">VERIFIABILITY · SP1 zkVM</text>
+  <g>
+    <rect x="30" y="298" width="240" height="78" class="box" rx="10"/>
+    <text x="150" y="332" text-anchor="middle" class="bt">SP1 batch proof</text>
+    <text x="150" y="350" text-anchor="middle" class="bs">totals correct + solvent</text>
+
+    <rect x="360" y="298" width="240" height="78" class="box" rx="10"/>
+    <text x="480" y="332" text-anchor="middle" class="bt">PredictionMarket</text>
+    <text x="480" y="350" text-anchor="middle" class="bs">settleWithProof()</text>
+
+    <rect x="690" y="298" width="240" height="78" rx="10" fill="#101a17" stroke="#2c4a40"/>
+    <text x="810" y="332" text-anchor="middle" class="bt">Claims unlock</text>
+    <text x="810" y="350" text-anchor="middle" class="bs">private zk claim → payout</text>
+
+    <line x1="270" y1="337" x2="358" y2="337" class="arrow" marker-end="url(#ar)"/>
+    <line x1="600" y1="337" x2="688" y2="337" class="arrow" marker-end="url(#ar)"/>
+  </g>
+
+  <!-- reconcile connector -->
+  <path d="M844,194 L844,250 L480,250 L480,296" class="arrow" stroke="#8fe6cb" stroke-dasharray="5 4" marker-end="url(#arg)"/>
+  <rect x="556" y="236" width="330" height="28" rx="8" fill="#0d1512" stroke="#2c4a40"/>
+  <text x="721" y="254" text-anchor="middle" fill="#8fe6cb" font-size="11">reconcile: confidential totals = SP1-verified totals ✓</text>
+</svg>

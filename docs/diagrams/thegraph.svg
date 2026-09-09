@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <defs>
+    <marker id="ar2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#5a5a66"/>
+    </marker>
+    <marker id="arp" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#c8a2ff"/>
+    </marker>
+    <style>
+      .t2{fill:#ededf0;font-size:18px;font-weight:600}
+      .s2{fill:#9a9aa6;font-size:11px}
+      .lane2{fill:#c8a2ff;font-size:11px;letter-spacing:.14em}
+      .bt2{fill:#f2f2f5;font-size:12px}
+      .bs2{fill:#8f8f99;font-size:10.5px}
+      .box2{fill:#131316;stroke:#2a2a30}
+      .arrow2{stroke:#5a5a66;stroke-width:1.4;fill:none}
+    </style>
+  </defs>
+  <rect width="960" height="470" fill="#0a0a0c"/>
+  <text x="30" y="42" class="t2">The Graph — Subgraph + AI Solvency &amp; Risk Oracle</text>
+  <text x="30" y="66" class="s2">Public/aggregate + commitments/nullifiers only — never plaintext positions. Agent pins the deployment id &amp; refuses stale data.</text>
+
+  <!-- source -->
+  <rect x="30" y="120" width="200" height="86" rx="10" class="box2"/>
+  <text x="130" y="152" text-anchor="middle" class="bt2">PredictionMarket</text>
+  <text x="130" y="170" text-anchor="middle" class="bs2">Sepolia events</text>
+  <text x="130" y="186" text-anchor="middle" class="bs2">Deposit·Resolve·Settle·Claim</text>
+
+  <!-- subgraph -->
+  <rect x="290" y="120" width="200" height="86" rx="10" fill="#160f1f" stroke="#3a2c4a"/>
+  <text x="390" y="150" text-anchor="middle" class="bt2">Obscura Subgraph</text>
+  <text x="390" y="168" text-anchor="middle" class="bs2">Studio · v0.0.2</text>
+  <text x="390" y="184" text-anchor="middle" class="bs2">Market·Deposit·Settlement</text>
+  <text x="390" y="199" text-anchor="middle" class="bs2">Claim·ProtocolSolvency</text>
+
+  <!-- agent -->
+  <rect x="550" y="98" width="230" height="130" rx="12" fill="#160f1f" stroke="#4a3a5f"/>
+  <text x="665" y="126" text-anchor="middle" class="lane2">AI RISK ORACLE (MCP)</text>
+  <text x="665" y="150" text-anchor="middle" class="bt2">Solvency coverage</text>
+  <text x="665" y="168" text-anchor="middle" class="bt2">HHI concentration</text>
+  <text x="665" y="190" text-anchor="middle" class="bs2">pinned deployment id</text>
+  <text x="665" y="206" text-anchor="middle" class="bs2">freshness-gated · refuses stale</text>
+
+  <!-- verdict -->
+  <rect x="820" y="120" width="120" height="86" rx="10" class="box2"/>
+  <text x="880" y="156" text-anchor="middle" class="bt2">Risk verdict</text>
+  <text x="880" y="174" text-anchor="middle" class="bs2">LOW→CRITICAL</text>
+
+  <line x1="230" y1="163" x2="288" y2="163" class="arrow2" marker-end="url(#ar2)"/>
+  <line x1="490" y1="163" x2="548" y2="163" class="arrow2" marker-end="url(#ar2)"/>
+  <line x1="780" y1="163" x2="818" y2="163" class="arrow2" marker-end="url(#ar2)"/>
+
+  <!-- composable benchmark -->
+  <text x="30" y="300" class="lane2">COMPOSABLE / STANDARDIZED TRACK</text>
+  <rect x="30" y="314" width="270" height="82" rx="10" class="box2"/>
+  <text x="165" y="346" text-anchor="middle" class="bt2">Messari standardized subgraph</text>
+  <text x="165" y="364" text-anchor="middle" class="bs2">Aave v2 (Ethereum mainnet)</text>
+  <text x="165" y="380" text-anchor="middle" class="bs2">via The Graph gateway</text>
+
+  <rect x="380" y="314" width="400" height="82" rx="10" fill="#160f1f" stroke="#3a2c4a"/>
+  <text x="580" y="346" text-anchor="middle" class="bt2">Benchmark: Obscura HHI vs live mainnet DeFi</text>
+  <text x="580" y="364" text-anchor="middle" class="bs2">same methodology · two Graph sources composed in one flow</text>
+  <text x="580" y="380" text-anchor="middle" class="bs2">→ "far more concentrated: early single-market book"</text>
+
+  <path d="M665,228 L665,270 L580,270 L580,312" class="arrow2" stroke="#c8a2ff" stroke-dasharray="5 4" marker-end="url(#arp)"/>
+  <line x1="300" y1="355" x2="378" y2="355" class="arrow2" marker-end="url(#ar2)"/>
+</svg>

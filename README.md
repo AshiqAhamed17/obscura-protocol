@@ -31,25 +31,55 @@ positions. The harder, largely unsolved problem is proving that the
 correct and solvent, without revealing any individual position. That gap is
 what this project explores.
 
-## Planned architecture
+## Architecture
 
-```
-Trader ──(shielded deposit / commitment)──▶ Market / Escrow contract
-                                                  │
-                                     market resolves (oracle price feed)
-                                                  │
-                          zero-knowledge proof: settlement is correct & solvent
-                                                  │
-                              winners claim privately and unlinkably
-```
+Obscura composes three integrations. Each diagram shows the data + proof flow
+for one; the "where's the integration" pointers link to the exact code.
+
+### Chainlink CRE — confidential + verifiable settlement
+
+The signature move: node operators sum private positions **inside a TEE** and
+cross back only aggregates, while an **SP1 proof** makes the settlement
+trustlessly correct on-chain. Confidentiality *and* verifiability — both kept.
+
+![Chainlink confidential + verifiable settlement](docs/diagrams/chainlink.svg)
+
+> **Where:** `cre-settlement/settlement/workflow.ts` (TEE handler) ·
+> `contracts/src/ConfidentialSettlementConsumer.sol` (reconciles vs SP1 totals) ·
+> `contracts/src/PredictionMarket.sol` `settleWithProof` · `guest/` + `host/` (SP1).
+
+### The Graph — subgraph + AI solvency/risk oracle
+
+A subgraph indexes only public/aggregate data (never plaintext positions); an
+AI risk oracle reasons over it with a **pinned deployment id + freshness gate**,
+and benchmarks Obscura against a **Messari-standardized** mainnet subgraph.
+
+![The Graph subgraph + AI risk oracle](docs/diagrams/thegraph.svg)
+
+> **Where:** `subgraph/` (schema + mappings, Studio v0.0.2) ·
+> `agent/src/` (`obscura-risk-oracle` MCP server: solvency + HHI + benchmark).
+
+### Circle / Arc — USDC-native escrow + CCTP cross-chain entry
+
+The escrow is USDC-denominated (ERC-20 + EIP-2612 permit); on Arc, USDC is the
+native gas token. Users can bridge USDC **Base → Arc via CCTP** and open a
+shielded position in one journey.
+
+![Circle/Arc USDC escrow + CCTP entry](docs/diagrams/arc.svg)
+
+> **Where:** `contracts/src/PredictionMarket.sol` (USDC escrow) ·
+> `cctp-entry/src/bridge-and-open.ts` (CCTP bridge → deposit) ·
+> live on Arc testnet (`contracts/deployments/arc-testnet.json`).
 
 | Layer | Tech |
 |---|---|
-| Settlement / escrow | Solidity, Foundry |
-| Privacy layer | Zero-knowledge circuits (shielded deposits + claims) |
+| Settlement / escrow | Solidity, Foundry (USDC-denominated) |
+| Privacy layer | Noir zk circuits — shielded deposits, claims, foresight, parlays, reputation |
 | Solvency proof | SP1 zkVM |
-| Oracle / resolution | Chainlink Price Feeds |
-| Client | Next.js, Wagmi, Viem |
+| Confidential settlement | Chainlink CRE (TEE) |
+| Indexing / risk agent | The Graph subgraph + MCP AI oracle |
+| Stablecoin / cross-chain | Circle USDC, Arc, CCTP |
+| Client | Next.js, Wagmi, Viem (Sepolia + Arc) |
 
 ## Status
 

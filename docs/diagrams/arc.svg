@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <defs>
+    <marker id="ar3" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#5a5a66"/>
+    </marker>
+    <marker id="art" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 z" fill="#6bd6b0"/>
+    </marker>
+    <style>
+      .t3{fill:#ededf0;font-size:18px;font-weight:600}
+      .s3{fill:#9a9aa6;font-size:11px}
+      .lane3{fill:#6bd6b0;font-size:11px;letter-spacing:.14em}
+      .bt3{fill:#f2f2f5;font-size:12px}
+      .bs3{fill:#8f8f99;font-size:10.5px}
+      .box3{fill:#131316;stroke:#2a2a30}
+      .arrow3{stroke:#5a5a66;stroke-width:1.4;fill:none}
+    </style>
+  </defs>
+  <rect width="960" height="470" fill="#0a0a0c"/>
+  <text x="30" y="42" class="t3">Circle / Arc — USDC-Native Escrow + CCTP Cross-Chain Entry</text>
+  <text x="30" y="66" class="s3">On Arc, USDC is the native gas token. The Noir/SP1 amount is a generic u64, so USDC 6-decimal base units drop in unchanged.</text>
+
+  <!-- CCTP lane -->
+  <text x="30" y="106" class="lane3">CROSS-CHAIN ENTRY · CCTP V2 (Circle Bridge Kit)</text>
+  <rect x="30" y="118" width="185" height="80" rx="10" class="box3"/>
+  <text x="122" y="150" text-anchor="middle" class="bt3">USDC on Base Sepolia</text>
+  <text x="122" y="168" text-anchor="middle" class="bs3">user holds USDC</text>
+  <text x="122" y="184" text-anchor="middle" class="bs3">(faucet.circle.com)</text>
+
+  <rect x="253" y="118" width="185" height="80" rx="10" fill="#0d1613" stroke="#2c4a3f"/>
+  <text x="345" y="150" text-anchor="middle" class="bt3">CCTP bridge</text>
+  <text x="345" y="168" text-anchor="middle" class="bs3">burn (domain 6)</text>
+  <text x="345" y="184" text-anchor="middle" class="bs3">→ mint (domain 26)</text>
+
+  <rect x="476" y="118" width="185" height="80" rx="10" class="box3"/>
+  <text x="568" y="150" text-anchor="middle" class="bt3">USDC on Arc</text>
+  <text x="568" y="168" text-anchor="middle" class="bs3">0x3600… · 6-dec</text>
+  <text x="568" y="184" text-anchor="middle" class="bs3">= native gas token</text>
+
+  <rect x="699" y="118" width="230" height="80" rx="10" fill="#0d1613" stroke="#2c4a3f"/>
+  <text x="814" y="150" text-anchor="middle" class="bt3">Open shielded position</text>
+  <text x="814" y="168" text-anchor="middle" class="bs3">approve → deposit(amount)</text>
+  <text x="814" y="184" text-anchor="middle" class="bs3">Poseidon commitment</text>
+
+  <line x1="215" y1="158" x2="251" y2="158" class="arrow3" marker-end="url(#ar3)"/>
+  <line x1="438" y1="158" x2="474" y2="158" class="arrow3" marker-end="url(#ar3)"/>
+  <line x1="661" y1="158" x2="697" y2="158" class="arrow3" marker-end="url(#ar3)"/>
+
+  <!-- Escrow lifecycle lane -->
+  <text x="30" y="288" class="lane3">USDC-DENOMINATED ESCROW · deposit → resolve → settle → claim</text>
+  <rect x="30" y="300" width="210" height="80" rx="10" class="box3"/>
+  <text x="135" y="332" text-anchor="middle" class="bt3">PredictionMarket</text>
+  <text x="135" y="350" text-anchor="middle" class="bs3">ERC-20 transferFrom</text>
+  <text x="135" y="366" text-anchor="middle" class="bs3">+ EIP-2612 permit</text>
+
+  <rect x="285" y="300" width="180" height="80" rx="10" class="box3"/>
+  <text x="375" y="336" text-anchor="middle" class="bt3">Resolve</text>
+  <text x="375" y="354" text-anchor="middle" class="bs3">feed / CRE / Graph</text>
+
+  <rect x="510" y="300" width="180" height="80" rx="10" class="box3"/>
+  <text x="600" y="336" text-anchor="middle" class="bt3">Settle (SP1)</text>
+  <text x="600" y="354" text-anchor="middle" class="bs3">proven totals</text>
+
+  <rect x="735" y="300" width="194" height="80" rx="10" fill="#0d1613" stroke="#2c4a3f"/>
+  <text x="832" y="336" text-anchor="middle" class="bt3">Claim USDC</text>
+  <text x="832" y="354" text-anchor="middle" class="bs3">private zk proof → transfer</text>
+
+  <line x1="240" y1="340" x2="283" y2="340" class="arrow3" marker-end="url(#ar3)"/>
+  <line x1="465" y1="340" x2="508" y2="340" class="arrow3" marker-end="url(#ar3)"/>
+  <line x1="690" y1="340" x2="733" y2="340" class="arrow3" marker-end="url(#ar3)"/>
+
+  <path d="M814,198 L814,236 L135,236 L135,298" class="arrow3" stroke="#6bd6b0" stroke-dasharray="5 4" marker-end="url(#art)"/>
+  <text x="474" y="230" text-anchor="middle" fill="#6bd6b0" font-size="11">bridged USDC funds the shielded deposit — one journey, Base → Arc → position</text>
+</svg>
