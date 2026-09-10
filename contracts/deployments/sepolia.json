@@ -31,6 +31,16 @@
       "verified": true,
       "explorer": "https://sepolia.etherscan.io/address/0x4ae8FF6f6D1957fCb72cb2002223c04Fd64235F3",
       "note": "Task 4.3 — CRE Graph-query resolver. Registered as the resolver for market 3 (SourceType.GraphQuery). A CRE workflow reads the subgraph metric and the DON delivers the outcome here, which calls reportResolution."
+    },
+    "ParlayVerifier": {
+      "address": "0xB68A6cb51C3035AD97E4FfB86F04C3B6CcB855C9",
+      "explorer": "https://sepolia.etherscan.io/address/0xB68A6cb51C3035AD97E4FfB86F04C3B6CcB855C9",
+      "note": "Phase 7.4 — UltraHonk verifier for the parlay claim circuit (RelationsLib/ZKTranscriptLib auto-linked via forge script)."
+    },
+    "ParlayPool": {
+      "address": "0x4C351042FcF905F76BAe0ef83e80de69eF8e378e",
+      "explorer": "https://sepolia.etherscan.io/address/0x4C351042FcF905F76BAe0ef83e80de69eF8e378e",
+      "note": "Phase 7.4 — dedicated shielded multi-leg pool. Wired to the canonical PredictionMarket + USDC; deployer is the settler (prod: SP1/DON forwarder). Deposits are USDC-escrowed against a Poseidon parlay commitment; a winning ticket claims with a zk proof that every leg backed the resolved outcome."
     }
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
