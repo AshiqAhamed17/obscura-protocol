@@ -10,8 +10,10 @@ import { priceUsd } from "@/lib/format";
 
 const LINKS = [
   { href: "/markets", label: "Markets" },
-  { href: "/deposit", label: "Deposit" },
-  { href: "/claim", label: "Claim" },
+  { href: "/parlays", label: "Parlays" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/reputation", label: "Reputation" },
+  { href: "/risk", label: "Risk" },
   { href: "/solvency", label: "Solvency" },
 ];
 

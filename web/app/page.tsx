@@ -5,6 +5,7 @@ import { Ruler } from "@/components/landing/Ruler";
 import { Features } from "@/components/landing/Features";
 import { WorkSection } from "@/components/landing/WorkSection";
 import { ProofSection } from "@/components/landing/ProofSection";
+import { Stack } from "@/components/landing/Stack";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
 export default function Home() {
@@ -39,6 +40,8 @@ export default function Home() {
       <Features />
       <Ruler />
       <WorkSection />
+      <Ruler />
+      <Stack />
       <Ruler />
       <ProofSection />
 

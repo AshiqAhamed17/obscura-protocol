@@ -10,6 +10,7 @@ export interface ChainDeployment {
   usdc: `0x${string}`;
   explorer: string;
   hasFeeds: boolean;
+  parlayPool?: `0x${string}`;
 }
 
 export const CHAINS: Record<number, ChainDeployment> = {
@@ -19,6 +20,7 @@ export const CHAINS: Record<number, ChainDeployment> = {
     usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
     explorer: "https://sepolia.etherscan.io",
     hasFeeds: true,
+    parlayPool: "0x4C351042FcF905F76BAe0ef83e80de69eF8e378e",
   },
   [arcTestnet.id]: {
     label: "Arc",
@@ -28,6 +30,17 @@ export const CHAINS: Record<number, ChainDeployment> = {
     hasFeeds: false,
   },
 };
+
+/// ParlayPool — dedicated shielded multi-leg pool.
+export const parlayPoolAbi = parseAbi([
+  "function deposit(bytes32 commitment, uint256 amount) returns (uint256 leafIndex)",
+  "function nullifierSpent(bytes32) view returns (bool)",
+  "function parlayRoot() view returns (bytes32)",
+  "function totalStaked() view returns (uint256)",
+  "function depositCount() view returns (uint256)",
+  "function getCommitments() view returns (bytes32[])",
+  "function claim(uint256[3] marketIds, uint256 amount, bytes32 nullifier, address recipient, bytes proof)",
+]);
 
 export const SUPPORTED_CHAINS = [sepolia, arcTestnet];
 
