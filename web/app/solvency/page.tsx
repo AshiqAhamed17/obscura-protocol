@@ -74,6 +74,11 @@ export default function SolvencyPage() {
           and they must reconcile with the USDC actually escrowed. Anyone can check that here. No
           individual position is ever revealed.
         </p>
+        <p className="hint" style={{ marginTop: "-0.4rem" }}>
+          Figures below cover the main market book. Private parlays are escrowed in a separate{" "}
+          <span className="mono">ParlayPool</span> — see its live balance on the{" "}
+          <a href="/parlays" style={{ textDecoration: "underline" }}>Parlays</a> page.
+        </p>
 
         {isLoading && <p className="muted mono">Loading…</p>}
         {!isLoading && n === 0 && <p className="muted">No markets yet.</p>}

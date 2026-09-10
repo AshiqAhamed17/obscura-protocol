@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, maxUint256, parseUnits } from "viem";
 import {
   useAccount,
   useChainId,
@@ -160,7 +160,8 @@ function BuildParlay({ pool }: { pool: `0x${string}` }) {
   }
 
   function approve() {
-    writeApprove({ abi: erc20Abi, address: usdcAddr, functionName: "approve", args: [pool, amountBase] });
+    // One-time unlimited approval so you never have to re-approve per ticket.
+    writeApprove({ abi: erc20Abi, address: usdcAddr, functionName: "approve", args: [pool, maxUint256] });
   }
 
   function submit() {
@@ -216,7 +217,7 @@ function BuildParlay({ pool }: { pool: `0x${string}` }) {
 
           {isConnected && needsApproval ? (
             <button className="btn primary" onClick={approve} disabled={!note || approving || approveConfirming}>
-              {approving ? "Confirm in wallet…" : approveConfirming ? "Approving USDC…" : `Approve ${amount} USDC`}
+              {approving ? "Confirm in wallet…" : approveConfirming ? "Approving USDC…" : "Approve USDC (one-time)"}
             </button>
           ) : (
             <button className="btn primary" onClick={submit} disabled={!isConnected || !note || isPending || confirming}>

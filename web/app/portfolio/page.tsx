@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { abi, contractsFor, feedLabel, parseMarket, type MarketTuple } from "@/lib/contract";
+import { useAccount, useChainId, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { abi, contractsFor, feedLabel, parseMarket, type Market, type MarketTuple } from "@/lib/contract";
 import {
   commitment,
   importNote,
@@ -66,27 +66,75 @@ export default function PortfolioPage() {
   );
 }
 
+/// A note's fully-resolved on-chain state, computed once at the parent level so
+/// bucket assignment never depends on whether a child has mounted.
+interface Position {
+  note: Note;
+  key: string;
+  market?: Market;
+  leaves: readonly `0x${string}`[];
+  claimed: boolean;
+  bucket: Bucket;
+  stake: bigint;
+  payout: bigint | null;
+  loaded: boolean;
+}
+
+function keyOf(n: Note): string {
+  return `${n.marketId}-${n.secret}`;
+}
+
 function PortfolioBody({ notes, recipient, onChange }: { notes: Note[]; recipient: `0x${string}`; onChange: () => void }) {
-  const [rows, setRows] = useState<Record<string, PositionState>>({});
-  const report = (key: string, s: PositionState) => setRows((r) => (r[key] === s ? r : { ...r, [key]: s }));
+  const chainId = useChainId();
+  const { predictionMarket, explorer } = contractsFor(chainId);
+
+  // One multicall for every position's on-chain state (market, totals,
+  // commitments, spent). Reads live at the PARENT so buckets are known before
+  // any row renders — the child no longer has to mount to classify itself.
+  const { data: multi, isLoading } = useReadContracts({
+    contracts: notes.flatMap((n) => [
+      { abi, address: predictionMarket, functionName: "markets" as const, args: [n.marketId] as const },
+      { abi, address: predictionMarket, functionName: "getOutcomeTotals" as const, args: [n.marketId] as const },
+      { abi, address: predictionMarket, functionName: "getCommitments" as const, args: [n.marketId] as const },
+      { abi, address: predictionMarket, functionName: "nullifierSpent" as const, args: [nullifier(n)] as const },
+    ]),
+    query: { enabled: notes.length > 0 },
+  });
+
+  const positions = useMemo<Position[]>(() => {
+    return notes.map((n) => {
+      const key = keyOf(n);
+      const base = notes.indexOf(n) * 4;
+      const marketRes = multi?.[base]?.result as unknown as MarketTuple | undefined;
+      const totals = (multi?.[base + 1]?.result as readonly bigint[] | undefined) ?? [];
+      const leaves = (multi?.[base + 2]?.result as readonly `0x${string}`[] | undefined) ?? [];
+      const claimed = multi?.[base + 3]?.result === true;
+      const market = marketRes ? parseMarket(marketRes) : undefined;
+
+      const isSettled = market?.status === 2;
+      const onWinningSide = market !== undefined && n.side === market.winningOutcome;
+      const winningTotal = market ? (totals[market.winningOutcome] ?? 0n) : 0n;
+      const payout = market && isSettled && onWinningSide && winningTotal > 0n ? (n.amount * market.totalPool) / winningTotal : null;
+      const bucket: Bucket = !isSettled ? "open" : onWinningSide && !claimed ? "claimable" : "history";
+
+      return { note: n, key, market, leaves, claimed, bucket, stake: n.amount, payout, loaded: !!market };
+    });
+  }, [notes, multi]);
 
   const summary = useMemo(() => {
     let atStake = 0n;
     let claimableEst = 0n;
-    let claimableCount = 0;
     let claimed = 0;
-    for (const s of Object.values(rows)) {
-      if (s.bucket === "open") atStake += s.stake;
-      if (s.bucket === "claimable") {
-        claimableCount++;
-        claimableEst += s.payout ?? 0n;
-      }
-      if (s.claimed) claimed++;
+    for (const p of positions) {
+      if (p.bucket === "open") atStake += p.stake;
+      if (p.bucket === "claimable") claimableEst += p.payout ?? 0n;
+      if (p.claimed) claimed++;
     }
-    return { atStake, claimableEst, claimableCount, claimed, total: notes.length };
-  }, [rows, notes.length]);
+    return { atStake, claimableEst, claimed, total: notes.length };
+  }, [positions, notes.length]);
 
-  const inBucket = (b: Bucket) => notes.filter((_, i) => rows[keyOf(notes[i])]?.bucket === b);
+  const inBucket = (b: Bucket) => positions.filter((p) => p.bucket === b);
+  const loadingRows = isLoading && positions.every((p) => !p.loaded);
 
   return (
     <>
@@ -97,23 +145,25 @@ function PortfolioBody({ notes, recipient, onChange }: { notes: Note[]; recipien
         <Stat label="Claimed" value={String(summary.claimed)} />
       </div>
 
+      {loadingRows && <p className="muted mono port-empty">Reading your positions on-chain…</p>}
+
       <Section title="Claimable" hint="Winning positions — prove and withdraw in USDC.">
-        {inBucket("claimable").map((n) => (
-          <PositionRow key={keyOf(n)} note={n} recipient={recipient} onState={(s) => report(keyOf(n), s)} onClaimed={onChange} />
+        {inBucket("claimable").map((p) => (
+          <PositionRow key={p.key} pos={p} recipient={recipient} predictionMarket={predictionMarket} explorer={explorer} onClaimed={onChange} />
         ))}
         {inBucket("claimable").length === 0 && <p className="muted mono port-empty">Nothing to claim yet.</p>}
       </Section>
 
       <Section title="Open" hint="Waiting on resolution + an SP1 settlement proof.">
-        {inBucket("open").map((n) => (
-          <PositionRow key={keyOf(n)} note={n} recipient={recipient} onState={(s) => report(keyOf(n), s)} onClaimed={onChange} />
+        {inBucket("open").map((p) => (
+          <PositionRow key={p.key} pos={p} recipient={recipient} predictionMarket={predictionMarket} explorer={explorer} onClaimed={onChange} />
         ))}
-        {inBucket("open").length === 0 && <p className="muted mono port-empty">No open positions.</p>}
+        {inBucket("open").length === 0 && !loadingRows && <p className="muted mono port-empty">No open positions.</p>}
       </Section>
 
       <Section title="History" hint="Settled positions — claimed, or on the losing side.">
-        {inBucket("history").map((n) => (
-          <PositionRow key={keyOf(n)} note={n} recipient={recipient} onState={(s) => report(keyOf(n), s)} onClaimed={onChange} />
+        {inBucket("history").map((p) => (
+          <PositionRow key={p.key} pos={p} recipient={recipient} predictionMarket={predictionMarket} explorer={explorer} onClaimed={onChange} />
         ))}
         {inBucket("history").length === 0 && <p className="muted mono port-empty">No settled positions yet.</p>}
       </Section>
@@ -123,59 +173,26 @@ function PortfolioBody({ notes, recipient, onChange }: { notes: Note[]; recipien
   );
 }
 
-interface PositionState {
-  bucket: Bucket;
-  stake: bigint;
-  payout: bigint | null;
-  claimed: boolean;
-}
-
-function keyOf(n: Note): string {
-  return `${n.marketId}-${n.secret}`;
-}
-
 function PositionRow({
-  note,
+  pos,
   recipient,
-  onState,
+  predictionMarket,
+  explorer,
   onClaimed,
 }: {
-  note: Note;
+  pos: Position;
   recipient: `0x${string}`;
-  onState: (s: PositionState) => void;
+  predictionMarket: `0x${string}`;
+  explorer: string;
   onClaimed: () => void;
 }) {
-  const chainId = useChainId();
-  const { predictionMarket, explorer } = contractsFor(chainId);
+  const { note, market, leaves, claimed, bucket, payout } = pos;
   const [proving, setProving] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
-  const { data: marketData } = useReadContract({ abi, address: predictionMarket, functionName: "markets", args: [note.marketId] });
-  const { data: totalsData } = useReadContract({ abi, address: predictionMarket, functionName: "getOutcomeTotals", args: [note.marketId] });
-  const { data: leavesData } = useReadContract({ abi, address: predictionMarket, functionName: "getCommitments", args: [note.marketId] });
-  const nul = useMemo(() => nullifier(note), [note]);
-  const { data: spent } = useReadContract({ abi, address: predictionMarket, functionName: "nullifierSpent", args: [nul] });
-
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-
-  const market = marketData ? parseMarket(marketData as unknown as MarketTuple) : undefined;
-  const totals = (totalsData as readonly bigint[] | undefined) ?? [];
-  const leaves = (leavesData as readonly `0x${string}`[] | undefined) ?? [];
-  const claimed = spent === true;
-
-  const isSettled = market?.status === 2;
-  const onWinningSide = market !== undefined && note.side === market.winningOutcome;
-  const winningTotal = market ? (totals[market.winningOutcome] ?? 0n) : 0n;
-  const payout = market && isSettled && onWinningSide && winningTotal > 0n ? (note.amount * market.totalPool) / winningTotal : null;
-
-  const bucket: Bucket = !isSettled ? "open" : onWinningSide && !claimed ? "claimable" : "history";
-
-  useEffect(() => {
-    if (market) onState({ bucket, stake: note.amount, payout, claimed });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [market?.status, market?.winningOutcome, claimed, payout]);
 
   useEffect(() => {
     if (isSuccess) onClaimed();
@@ -185,18 +202,19 @@ function PositionRow({
   async function claim() {
     setError("");
     try {
+      if (!market) throw new Error("Market not loaded yet.");
       const leafIndex = leaves.findIndex((c) => c.toLowerCase() === commitment(note).toLowerCase());
       if (leafIndex < 0) throw new Error("Commitment not found in this market's tree.");
       setProving(true);
       setStatus("Proving in your browser…");
       const cp = await generateClaimProof({
         note,
-        winningOutcome: market!.winningOutcome,
+        winningOutcome: market.winningOutcome,
         leaves: leaves.map((c) => BigInt(c)),
         leafIndex,
         recipient,
       });
-      if (cp.computedRoot.toLowerCase() !== market!.merkleRoot.toLowerCase()) {
+      if (cp.computedRoot.toLowerCase() !== market.merkleRoot.toLowerCase()) {
         throw new Error("Root mismatch — is the market fully settled?");
       }
       setStatus("Submitting claim…");

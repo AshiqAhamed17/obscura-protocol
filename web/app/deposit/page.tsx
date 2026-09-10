@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, maxUint256, parseUnits } from "viem";
 import { useAccount, useChainId, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import {
   abi,
@@ -124,7 +124,8 @@ function DepositForm() {
   const needsApproval = (allowance as bigint | undefined ?? 0n) < amountBase;
 
   function approve() {
-    writeApprove({ abi: erc20Abi, address: usdcAddr, functionName: "approve", args: [predictionMarket, amountBase] });
+    // One-time unlimited approval so you never have to re-approve per bet.
+    writeApprove({ abi: erc20Abi, address: usdcAddr, functionName: "approve", args: [predictionMarket, maxUint256] });
   }
 
   function submit() {
@@ -206,7 +207,7 @@ function DepositForm() {
 
           {isConnected && isOpen && needsApproval ? (
             <button className="btn primary" onClick={approve} disabled={!pendingNote || approving || approveConfirming}>
-              {approving ? "Confirm in wallet…" : approveConfirming ? "Approving USDC…" : `Approve ${amount} USDC`}
+              {approving ? "Confirm in wallet…" : approveConfirming ? "Approving USDC…" : "Approve USDC (one-time)"}
             </button>
           ) : (
             <button className="btn primary" onClick={submit} disabled={!isConnected || !isOpen || !pendingNote || isPending || confirming}>
