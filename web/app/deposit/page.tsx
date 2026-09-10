@@ -19,6 +19,7 @@ import {
 import { commitment, newNote, saveNote, type Note } from "@/lib/note";
 import { usd, statusLabel, priceUsd } from "@/lib/format";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
+import { useMarkets } from "@/hooks/useMarkets";
 import { PriceChart } from "@/components/PriceChart";
 import { Countdown } from "@/components/Countdown";
 import { AmbientField } from "@/components/AmbientField";
@@ -54,6 +55,7 @@ function DepositForm() {
   const [amount, setAmount] = useState("5");
   const [savedNote, setSavedNote] = useState<Note | null>(null);
 
+  const { options: marketOptions } = useMarkets();
   const { data: count } = useReadContract({ abi, address: predictionMarket, functionName: "marketCount" });
   const { data: marketData } = useReadContract({
     abi,
@@ -150,11 +152,17 @@ function DepositForm() {
           <div className="field">
             <label>Market</label>
             <select value={marketId} onChange={(e) => setMarketId(e.target.value)}>
-              {Array.from({ length: Math.max(marketCount, 1) }, (_, i) => (
-                <option key={i} value={i}>
-                  Market #{i}
-                </option>
-              ))}
+              {marketOptions.length > 0
+                ? marketOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      #{o.id} · {o.title} · {statusLabel(o.market.status)}
+                    </option>
+                  ))
+                : Array.from({ length: Math.max(marketCount, 1) }, (_, i) => (
+                    <option key={i} value={i}>
+                      Market #{i}
+                    </option>
+                  ))}
             </select>
             {market && feed && (
               <span className="hint">

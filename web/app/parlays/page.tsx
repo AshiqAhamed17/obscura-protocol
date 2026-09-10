@@ -14,12 +14,9 @@ import {
   abi,
   contractsFor,
   erc20Abi,
-  feedLabel,
   parlayPoolAbi,
-  parseMarket,
   Side,
   USDC_DECIMALS,
-  type MarketTuple,
 } from "@/lib/contract";
 import {
   newParlayNote,
@@ -33,6 +30,8 @@ import {
   type ParlayNote,
 } from "@/lib/parlay";
 import { AmbientField } from "@/components/AmbientField";
+import { useMarkets, type MarketOption } from "@/hooks/useMarkets";
+import { statusLabel } from "@/lib/format";
 
 const CHIPS = ["1", "5", "10"];
 
@@ -99,6 +98,7 @@ function BuildParlay({ pool }: { pool: `0x${string}` }) {
   const [amount, setAmount] = useState("5");
   const [saved, setSaved] = useState<ParlayNote | null>(null);
 
+  const { options: marketOptions } = useMarkets();
   const { data: count } = useReadContract({ abi, address: predictionMarket, functionName: "marketCount" });
   const marketCount = Math.max(Number(count ?? 0n), PARLAY_LEGS);
 
@@ -187,7 +187,7 @@ function BuildParlay({ pool }: { pool: `0x${string}` }) {
               index={i}
               leg={leg}
               marketCount={marketCount}
-              market={predictionMarket}
+              options={marketOptions}
               onChange={(patch) => setLeg(i, patch)}
             />
           ))}
@@ -281,19 +281,15 @@ function LegPicker({
   index,
   leg,
   marketCount,
-  market,
+  options,
   onChange,
 }: {
   index: number;
   leg: ParlayLeg;
   marketCount: number;
-  market: `0x${string}`;
+  options: MarketOption[];
   onChange: (patch: Partial<ParlayLeg>) => void;
 }) {
-  const { data } = useReadContract({ abi, address: market, functionName: "markets", args: [leg.marketId] });
-  const m = data ? parseMarket(data as unknown as MarketTuple) : undefined;
-  const feed = m ? feedLabel(m.feed) : null;
-
   return (
     <div className="leg">
       <span className="leg-n mono">Leg {index + 1}</span>
@@ -302,12 +298,17 @@ function LegPicker({
         value={leg.marketId.toString()}
         onChange={(e) => onChange({ marketId: BigInt(e.target.value) })}
       >
-        {Array.from({ length: marketCount }, (_, i) => (
-          <option key={i} value={i}>
-            Market #{i}
-            {feed && i === Number(leg.marketId) ? ` · ${feed.asset}/${feed.unit}` : ""}
-          </option>
-        ))}
+        {options.length > 0
+          ? options.map((o) => (
+              <option key={o.id} value={o.id}>
+                #{o.id} · {o.title} · {statusLabel(o.market.status)}
+              </option>
+            ))
+          : Array.from({ length: marketCount }, (_, i) => (
+              <option key={i} value={i}>
+                Market #{i}
+              </option>
+            ))}
       </select>
       <div className="leg-side">
         <button className={leg.outcome === Side.Yes ? "sel-yes" : ""} onClick={() => onChange({ outcome: Side.Yes })}>
