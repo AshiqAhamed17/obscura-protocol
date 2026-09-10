@@ -35,6 +35,15 @@ export function nullifier(n: Note): `0x${string}` {
   return toBytes32(h);
 }
 
+/// Domain-separated foresight nullifier — matches Noir `Note::foresight_nullifier`
+/// = hash_2(nullifier_secret, market_id + FORESIGHT_DOMAIN). Distinct from the
+/// spend nullifier so a "I called it" credential is unlinkable to the payout.
+export const FORESIGHT_DOMAIN = 0x666f7265736967687400000000000000000000000000000000000000n;
+export function foresightNullifier(n: Note): `0x${string}` {
+  const h = poseidon2([n.nullifierSecret, n.marketId + FORESIGHT_DOMAIN]);
+  return toBytes32(h);
+}
+
 export function newNote(marketId: bigint, side: Side, amount: bigint, chainId?: number): Note {
   return { marketId, side, amount, secret: randomField(), nullifierSecret: randomField(), chainId };
 }

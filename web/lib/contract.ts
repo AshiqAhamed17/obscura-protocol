@@ -11,6 +11,7 @@ export interface ChainDeployment {
   explorer: string;
   hasFeeds: boolean;
   parlayPool?: `0x${string}`;
+  foresightRegistry?: `0x${string}`;
 }
 
 export const CHAINS: Record<number, ChainDeployment> = {
@@ -21,6 +22,7 @@ export const CHAINS: Record<number, ChainDeployment> = {
     explorer: "https://sepolia.etherscan.io",
     hasFeeds: true,
     parlayPool: "0x4C351042FcF905F76BAe0ef83e80de69eF8e378e",
+    foresightRegistry: "0x6d6B0dD2f40BCA7658237dD0F0c9527a068DaF97",
   },
   [arcTestnet.id]: {
     label: "Arc",
@@ -40,6 +42,13 @@ export const parlayPoolAbi = parseAbi([
   "function depositCount() view returns (uint256)",
   "function getCommitments() view returns (bytes32[])",
   "function claim(uint256[3] marketIds, uint256 amount, bytes32 nullifier, address recipient, bytes proof)",
+]);
+
+/// ForesightRegistry — anonymous "I called it" credentials over settled markets.
+export const foresightRegistryAbi = parseAbi([
+  "function proveForesight(uint256 marketId, bytes32 foresightNullifier, bytes proof)",
+  "function foresightProven(bytes32) view returns (bool)",
+  "function foresightCount(uint256) view returns (uint256)",
 ]);
 
 export const SUPPORTED_CHAINS = [sepolia, arcTestnet];

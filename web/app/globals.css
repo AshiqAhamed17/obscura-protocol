@@ -2691,6 +2691,35 @@ footer {
 .pk-bucket.warn {
   color: #ffce9f;
 }
+/* reputation badge */
+.rep-badge {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+  padding: 1.5rem 1.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+.rep-badge.earned {
+  border-color: color-mix(in srgb, var(--yes) 45%, var(--line));
+  background: color-mix(in srgb, var(--yes) 7%, var(--panel));
+}
+.rep-badge-mark {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--fg-3);
+}
+.rep-badge.earned .rep-badge-mark {
+  color: var(--yes);
+}
+.rep-badge-title {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: var(--fg);
+}
+
 @media (max-width: 680px) {
   .leg {
     grid-template-columns: 1fr;
@@ -2702,6 +2731,10 @@ footer {
   }
   .pk-side {
     align-items: flex-start;
+  }
+  .rep-badge {
+    flex-direction: column;
+    gap: 0.8rem;
   }
 }
 
