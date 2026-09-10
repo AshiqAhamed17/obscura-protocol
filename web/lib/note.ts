@@ -6,9 +6,10 @@ import { FIELD_MODULUS, Side } from "./contract";
 export interface Note {
   marketId: bigint;
   side: Side;
-  amount: bigint; // wei
+  amount: bigint; // USDC base units (6 decimals)
   secret: bigint;
   nullifierSecret: bigint;
+  chainId?: number; // which network this position was taken on
 }
 
 function randomField(): bigint {
@@ -34,8 +35,8 @@ export function nullifier(n: Note): `0x${string}` {
   return toBytes32(h);
 }
 
-export function newNote(marketId: bigint, side: Side, amount: bigint): Note {
-  return { marketId, side, amount, secret: randomField(), nullifierSecret: randomField() };
+export function newNote(marketId: bigint, side: Side, amount: bigint, chainId?: number): Note {
+  return { marketId, side, amount, secret: randomField(), nullifierSecret: randomField(), chainId };
 }
 
 function toBytes32(v: bigint): `0x${string}` {
@@ -46,7 +47,7 @@ function toBytes32(v: bigint): `0x${string}` {
 
 const KEY = "obscura.notes";
 
-interface StoredNote {
+export interface StoredNote {
   marketId: string;
   side: number;
   amount: string;
@@ -54,6 +55,7 @@ interface StoredNote {
   nullifierSecret: string;
   commitment: string;
   createdAt: number;
+  chainId?: number;
 }
 
 export function saveNote(n: Note): void {
@@ -66,8 +68,31 @@ export function saveNote(n: Note): void {
     nullifierSecret: n.nullifierSecret.toString(),
     commitment: commitment(n),
     createdAt: Date.now(),
+    chainId: n.chainId,
   });
   localStorage.setItem(KEY, JSON.stringify(all));
+}
+
+/// Import a note from its exported JSON (restore across browsers/devices).
+/// Returns false if it's malformed or a duplicate.
+export function importNote(json: string): boolean {
+  try {
+    const p = JSON.parse(json);
+    const n: Note = {
+      marketId: BigInt(p.marketId),
+      side: Number(p.side) as Side,
+      amount: BigInt(p.amount),
+      secret: BigInt(p.secret),
+      nullifierSecret: BigInt(p.nullifierSecret),
+      chainId: p.chainId ? Number(p.chainId) : undefined,
+    };
+    const c = commitment(n);
+    if (loadNotes().some((s) => s.commitment === c)) return false; // already have it
+    saveNote(n);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function loadNotes(): StoredNote[] {
@@ -86,5 +111,22 @@ export function storedToNote(s: StoredNote): Note {
     amount: BigInt(s.amount),
     secret: BigInt(s.secret),
     nullifierSecret: BigInt(s.nullifierSecret),
+    chainId: s.chainId,
   };
+}
+
+/// Export a note as portable JSON (the holder needs this to claim elsewhere).
+export function noteToJson(n: Note): string {
+  return JSON.stringify(
+    {
+      marketId: n.marketId.toString(),
+      side: n.side,
+      amount: n.amount.toString(),
+      secret: n.secret.toString(),
+      nullifierSecret: n.nullifierSecret.toString(),
+      chainId: n.chainId,
+    },
+    null,
+    2,
+  );
 }

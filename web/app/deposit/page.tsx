@@ -101,7 +101,7 @@ function DepositForm() {
   const pendingNote = useMemo<Note | null>(() => {
     try {
       if (amountBase <= 0n) return null;
-      return newNote(BigInt(marketId || "0"), side, amountBase);
+      return newNote(BigInt(marketId || "0"), side, amountBase, chainId);
     } catch {
       return null;
     }
