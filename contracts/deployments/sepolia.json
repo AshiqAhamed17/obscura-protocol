@@ -61,6 +61,16 @@
     "XAU_USD": "0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea",
     "EUR_USD": "0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910"
   },
+  "seededMarkets": [
+    { "id": 0, "category": "Crypto", "source": "ChainlinkFeed", "title": "ETH/USD >= $3,000", "feed": "0x694AA1769357215DE4FAC081bf1f309aDC325306" },
+    { "id": 1, "category": "Crypto", "source": "ChainlinkFeed", "title": "BTC/USD >= $100,000", "feed": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43" },
+    { "id": 2, "category": "Crypto", "source": "ChainlinkFeed", "title": "LINK/USD >= $15", "feed": "0xc59E3633BAAC79493d908e63626716e204A45EdF" },
+    { "id": 3, "category": "Sports", "source": "GraphQuery", "title": "Graph-resolved market", "feed": null },
+    { "id": 4, "category": "Commodities", "source": "ChainlinkFeed", "title": "Gold (XAU/USD) >= $4,500", "feed": "0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea" },
+    { "id": 5, "category": "Forex", "source": "ChainlinkFeed", "title": "EUR/USD >= 1.15", "feed": "0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910" },
+    { "id": 6, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 3, "title": "UEFA Champions League winner", "sourceRef": "obscura-sports-ucl-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" }
+  ],
+  "seededMarketsNote": "Phase 8.1 (2026-09-12): extended the board to cover every category tab. Crypto (ETH/BTC/LINK) from the first seed; added Gold (commodity) + EUR/USD (forex) via createMarket, and one 3-outcome categorical/sports market (UCL winner) via createMarketWithSource (CreWorkflow, operator stands in for the DON/CRE forwarder). Market #3 is the pre-existing Graph-resolved market.",
   "deployer": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308",
   "notes": "Phase-4 redeploy (2026-09-09): the canonical Sepolia stack is now the N-outcome/categorical PredictionMarket (real programVKey 0x00ea..., settleWithProof live), USDC-denominated (ERC-20 approve/transferFrom + EIP-2612 permit), plus the ForesightRegistry and the ConfidentialSettlementConsumer that receives the Chainlink CRE confidential settlement report and reconciles it against the SP1-verified totals. Replaces the pre-categorical BINARY baseline at 0x3B50a4e8... The subgraph is re-pointed to this address as v0.0.2. 54 Foundry + 17 Rust + 37 Noir tests green."
 }
