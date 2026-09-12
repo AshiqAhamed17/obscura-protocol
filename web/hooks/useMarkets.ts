@@ -23,11 +23,32 @@ export function marketTitle(m: Market, source: number): string {
   return "CRE-resolved market";
 }
 
+export type MarketCategory = "Crypto" | "Commodities" | "Forex" | "Sports";
+
+/// Verified Sepolia feed → category. Crypto assets, gold (commodity), EUR (forex).
+const FEED_CATEGORY: Record<string, MarketCategory> = {
+  "0x694aa1769357215de4fac081bf1f309adc325306": "Crypto", // ETH
+  "0x1b44f3514812d835eb1bdb0acb33d3fa3351ee43": "Crypto", // BTC
+  "0xc59e3633baac79493d908e63626716e204a45edf": "Crypto", // LINK
+  "0xc5981f461d74c46eb4b0cf3f4ec79f025573b0ea": "Commodities", // XAU (gold)
+  "0x1a81afb8146aeffcfc5e50e8479e826e7d55b910": "Forex", // EUR
+};
+
+/// Category for the secondary nav: price-feed markets by asset class; non-feed
+/// (Graph/CRE event) markets are grouped under Sports.
+export function marketCategory(m: Market, source: number): MarketCategory {
+  if (source === ResolutionSource.ChainlinkFeed) {
+    return FEED_CATEGORY[m.feed.toLowerCase()] ?? "Crypto";
+  }
+  return "Sports";
+}
+
 export interface MarketOption {
   id: number;
   market: Market;
   source: number;
   title: string;
+  category: MarketCategory;
 }
 
 /// Loads every market on the connected chain (via multicall) with a ready-made
@@ -72,7 +93,7 @@ export function useMarkets(): { options: MarketOption[]; count: number; isLoadin
         const market = parseMarket(r.result as unknown as MarketTuple);
         const src = sources?.[i]?.result as readonly [number, ...unknown[]] | undefined;
         const source = src ? Number(src[0]) : ResolutionSource.ChainlinkFeed;
-        return { id: i, market, source, title: marketTitle(market, source) };
+        return { id: i, market, source, title: marketTitle(market, source), category: marketCategory(market, source) };
       })
       .filter((o): o is MarketOption => o !== null);
   }, [raw, sources]);

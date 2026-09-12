@@ -2547,6 +2547,57 @@ footer {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- markets category nav --- */
+.catbar {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 1.6rem 0 0.4rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.catbar::-webkit-scrollbar {
+  display: none;
+}
+.catbar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.catbar-tab:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.03);
+}
+.catbar-tab.on {
+  color: var(--fg);
+  background: rgba(var(--cool), 0.12);
+  border-color: color-mix(in srgb, rgb(var(--cool)) 30%, var(--line));
+}
+.catbar-count {
+  font-size: 0.7rem;
+  color: var(--fg-3);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  min-width: 1.4em;
+  text-align: center;
+}
+.catbar-tab.on .catbar-count {
+  color: var(--fg);
+  background: rgba(var(--cool), 0.2);
+}
+
 /* --- parlays --- */
 .seg {
   display: inline-flex;

@@ -15,6 +15,7 @@ import {
   type MarketTuple,
 } from "@/lib/contract";
 import { statusLabel, statusClass, outcomeLabel, usd, usdc, usdcCompact, priceUsd } from "@/lib/format";
+import { marketCategory, type MarketCategory } from "@/hooks/useMarkets";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
 import { PriceChart } from "./PriceChart";
 import { Countdown } from "./Countdown";
@@ -28,6 +29,16 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "open", label: "Open" },
   { key: "resolved", label: "Resolved" },
   { key: "settled", label: "Settled" },
+];
+
+// Secondary category nav — only categories we actually have live markets for.
+type Cat = "Trending" | MarketCategory;
+const CATEGORIES: { key: Cat; label: string }[] = [
+  { key: "Trending", label: "Trending" },
+  { key: "Crypto", label: "Crypto" },
+  { key: "Commodities", label: "Commodities" },
+  { key: "Forex", label: "Forex" },
+  { key: "Sports", label: "Sports" },
 ];
 
 /// Human title for a market: feed-resolved shows the asset + threshold;
@@ -73,6 +84,7 @@ export function MarketList() {
 
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("soon");
+  const [category, setCategory] = useState<Cat>("Trending");
 
   const rows: Row[] = useMemo(() => {
     if (!raw) return [];
@@ -97,15 +109,21 @@ export function MarketList() {
     return { tvl, positions, open, total: rows.length };
   }, [rows]);
 
-  // the featured market: the open, feed-resolved market resolving soonest
+  // rows within the active category tab ("Trending" = everything).
+  const catRows = useMemo(
+    () => (category === "Trending" ? rows : rows.filter((r) => marketCategory(r.m, r.source) === category)),
+    [rows, category],
+  );
+
+  // the featured market: the open, feed-resolved market resolving soonest (within the category)
   const featured = useMemo(() => {
-    const openRows = rows.filter((r) => r.m.status === 0 && r.source === ResolutionSource.ChainlinkFeed);
+    const openRows = catRows.filter((r) => r.m.status === 0 && r.source === ResolutionSource.ChainlinkFeed);
     if (openRows.length === 0) return null;
     return [...openRows].sort((a, b) => Number(a.m.resolveAfter - b.m.resolveAfter))[0];
-  }, [rows]);
+  }, [catRows]);
 
   const shown = useMemo(() => {
-    let list = rows;
+    let list = catRows;
     if (filter !== "all") {
       const want = filter === "open" ? 0 : filter === "resolved" ? 1 : 2;
       list = list.filter((r) => r.m.status === want);
@@ -116,7 +134,7 @@ export function MarketList() {
     else if (sort === "newest") arr.sort((a, b) => Number(b.id - a.id));
     else arr.sort((a, b) => Number(a.m.resolveAfter - b.m.resolveAfter));
     return arr;
-  }, [rows, filter, sort, featured]);
+  }, [catRows, filter, sort, featured]);
 
   if (isLoading) return <p className="muted mono">Loading markets on {netLabel}…</p>;
   if (n === 0) return <p className="muted">No markets on {netLabel} yet — switch network or check back soon.</p>;
@@ -130,6 +148,26 @@ export function MarketList() {
         <Stat label="Total escrowed" value={usdcCompact(stats.tvl)} />
         <Stat label="Shielded positions" value={String(stats.positions)} accent />
       </div>
+
+      <nav className="catbar" aria-label="Market categories">
+        {CATEGORIES.map((c) => {
+          const count = c.key === "Trending" ? rows.length : rows.filter((r) => marketCategory(r.m, r.source) === c.key).length;
+          return (
+            <button
+              key={c.key}
+              className={`catbar-tab ${category === c.key ? "on" : ""}`}
+              onClick={() => setCategory(c.key)}
+            >
+              {c.label}
+              <span className="catbar-count mono">{count}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {shown.length === 0 && !featured && (
+        <p className="muted" style={{ marginTop: "1.4rem" }}>No markets in {category} yet.</p>
+      )}
 
       {featured && (filter === "all" || filter === "open") && (
         <FeaturedMarket key={featured.id.toString()} id={featured.id} m={featured.m} source={featured.source} />
