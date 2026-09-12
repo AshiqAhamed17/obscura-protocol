@@ -9,6 +9,7 @@ import {
   abi,
   erc20Abi,
   contractsFor,
+  ResolutionSource,
   Side,
   USDC_DECIMALS,
   parseMarket,
@@ -19,8 +20,8 @@ import {
 import { commitment, newNote, saveNote, type Note } from "@/lib/note";
 import { usd, statusLabel, priceUsd } from "@/lib/format";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
-import { useMarkets } from "@/hooks/useMarkets";
-import { PriceChart } from "@/components/PriceChart";
+import { useMarkets, marketOutcomeLabels } from "@/hooks/useMarkets";
+import { ChartPanel } from "@/components/ChartPanel";
 import { Countdown } from "@/components/Countdown";
 import { AmbientField } from "@/components/AmbientField";
 
@@ -51,7 +52,7 @@ function DepositForm() {
   const chainId = useChainId();
   const { predictionMarket, usdc: usdcAddr, explorer } = contractsFor(chainId);
   const [marketId, setMarketId] = useState<string>(params.get("market") ?? "0");
-  const [side, setSide] = useState<Side>(Side.Yes);
+  const [side, setSide] = useState<number>(1);
   const [amount, setAmount] = useState("5");
   const [savedNote, setSavedNote] = useState<Note | null>(null);
 
@@ -63,7 +64,25 @@ function DepositForm() {
     functionName: "markets",
     args: [BigInt(marketId || "0")],
   });
+  const { data: cfgData } = useReadContract({
+    abi,
+    address: predictionMarket,
+    functionName: "resolutionConfig",
+    args: [BigInt(marketId || "0")],
+  });
   const market = marketData ? parseMarket(marketData as unknown as MarketTuple) : undefined;
+  const cfg = cfgData as readonly [number, string, string] | undefined;
+  const marketSource = cfg ? Number(cfg[0]) : ResolutionSource.ChainlinkFeed;
+  const marketSourceRef = cfg ? String(cfg[2]) : "";
+  const isFeedMarket = marketSource === ResolutionSource.ChainlinkFeed;
+  const numOutcomes = market?.numOutcomes ?? 2;
+  const outcomeLabels = marketOutcomeLabels(marketSourceRef, numOutcomes);
+
+  // Reset the selected side when switching markets (categorical vs binary differ).
+  useEffect(() => {
+    setSide(numOutcomes > 2 ? 0 : 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketId, numOutcomes]);
 
   const { data: usdcBalance } = useReadContract({
     abi: erc20Abi,
@@ -103,7 +122,7 @@ function DepositForm() {
   const pendingNote = useMemo<Note | null>(() => {
     try {
       if (amountBase <= 0n) return null;
-      return newNote(BigInt(marketId || "0"), side, amountBase, chainId);
+      return newNote(BigInt(marketId || "0"), side as Side, amountBase, chainId);
     } catch {
       return null;
     }
@@ -148,7 +167,7 @@ function DepositForm() {
     <div className="split">
       {/* left — the form */}
       <div className="panel">
-        {market && <MarketContext market={market} />}
+        {market && isFeedMarket && <MarketContext market={market} />}
         <div className="form">
           <div className="field">
             <label>Market</label>
@@ -165,23 +184,36 @@ function DepositForm() {
                     </option>
                   ))}
             </select>
-            {market && feed && (
+            {market && isFeedMarket && feed && (
               <span className="hint">
                 {feed.asset} ≥ {usd(market.threshold)} · {statusLabel(status!)}
               </span>
             )}
+            {market && !isFeedMarket && (
+              <span className="hint">Resolved via {marketSource === ResolutionSource.GraphQuery ? "The Graph" : "Chainlink CRE"} · {statusLabel(status!)}</span>
+            )}
           </div>
 
           <div className="field">
-            <label>Your side</label>
-            <div className="side-toggle">
-              <button type="button" className={side === Side.Yes ? "sel-yes" : ""} onClick={() => setSide(Side.Yes)}>
-                Yes · above
-              </button>
-              <button type="button" className={side === Side.No ? "sel-no" : ""} onClick={() => setSide(Side.No)}>
-                No · below
-              </button>
-            </div>
+            <label>{numOutcomes > 2 ? "Your pick" : "Your side"}</label>
+            {numOutcomes > 2 ? (
+              <div className="outcome-pick">
+                {outcomeLabels.map((label, i) => (
+                  <button type="button" key={i} className={side === i ? "on" : ""} onClick={() => setSide(i)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="side-toggle">
+                <button type="button" className={side === Side.Yes ? "sel-yes" : ""} onClick={() => setSide(Side.Yes)}>
+                  Yes{isFeedMarket ? " · above" : ""}
+                </button>
+                <button type="button" className={side === Side.No ? "sel-no" : ""} onClick={() => setSide(Side.No)}>
+                  No{isFeedMarket ? " · below" : ""}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="field">
@@ -288,7 +320,7 @@ function MarketContext({ market }: { market: Market }) {
           <Countdown resolveAfter={market.resolveAfter} />
         </div>
       </div>
-      <PriceChart points={points} threshold={target} variant="spark" height={52} />
+      <ChartPanel feed={market.feed} threshold={target} points={points} height={180} />
     </div>
   );
 }

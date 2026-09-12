@@ -33,6 +33,22 @@ export const SOURCE_REF_MARKETS: Record<string, { title: string; outcomes?: stri
     title: "UEFA Champions League — Winner",
     outcomes: ["Real Madrid", "Man City", "Field"],
   },
+  "f1-wdc-2026": {
+    title: "F1 World Drivers' Champion 2026",
+    outcomes: ["Verstappen", "Norris", "Leclerc", "Field"],
+  },
+  "f1-wcc-2026": {
+    title: "F1 Constructors' Champion 2026",
+    outcomes: ["Red Bull", "McLaren", "Ferrari", "Field"],
+  },
+  "f1-spain-gp-2026": {
+    title: "Spanish GP (Madrid) 2026 — Winner",
+    outcomes: ["Verstappen", "Norris", "Leclerc", "Field"],
+  },
+  "f1-azerbaijan-gp-2026": {
+    title: "Azerbaijan GP 2026 — Winner",
+    outcomes: ["Verstappen", "Piastri", "Leclerc", "Field"],
+  },
 };
 
 /// Human title for a market: feed-resolved shows the asset + threshold;
@@ -46,6 +62,15 @@ export function marketTitle(m: Market, source: number, sourceRef?: string): stri
   if (known) return known.title;
   if (source === ResolutionSource.GraphQuery) return "Graph-resolved market";
   return "CRE-resolved market";
+}
+
+/// Outcome labels for a market: binary feed markets are No/Yes; categorical
+/// markets pull labels from their sourceRef mapping (falling back to Outcome N).
+export function marketOutcomeLabels(sourceRef: string | undefined, numOutcomes: number): string[] {
+  const known = SOURCE_REF_MARKETS[decodeSourceRef(sourceRef)];
+  if (known?.outcomes && known.outcomes.length === numOutcomes) return known.outcomes;
+  if (numOutcomes === 2) return ["No", "Yes"];
+  return Array.from({ length: numOutcomes }, (_, i) => `Outcome ${i + 1}`);
 }
 
 export type MarketCategory = "Crypto" | "Commodities" | "Forex" | "Sports";

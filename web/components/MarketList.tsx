@@ -306,6 +306,7 @@ function MarketCard({ id, m, source, sourceRef, index }: Row & { index: number }
   const isOpen = m.status === 0;
 
   return (
+    <Link href={`/markets/${id.toString()}`} className="card-link">
     <motion.article
       className="card tilt"
       initial={{ opacity: 0, y: 18 }}
@@ -363,21 +364,10 @@ function MarketCard({ id, m, source, sourceRef, index }: Row & { index: number }
         )}
       </div>
 
-      <div className="actions">
-        {isOpen && (
-          <Link className="btn primary sm" href={`/deposit?market=${id.toString()}`}>
-            Take a position
-          </Link>
-        )}
-        {m.status === 2 && (
-          <Link className="btn sm" href={`/portfolio`}>
-            Claim
-          </Link>
-        )}
-        <Link className="btn sm ghost" href={`/solvency?market=${id.toString()}`}>
-          Solvency
-        </Link>
+      <div className="card-foot">
+        <span className="card-cta mono">{isOpen ? "Take a position" : m.status === 2 ? "Claim winnings" : "View market"} →</span>
       </div>
     </motion.article>
+    </Link>
   );
 }
