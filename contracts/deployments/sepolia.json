@@ -68,7 +68,11 @@
     { "id": 3, "category": "Sports", "source": "GraphQuery", "title": "Graph-resolved market", "feed": null },
     { "id": 4, "category": "Commodities", "source": "ChainlinkFeed", "title": "Gold (XAU/USD) >= $4,500", "feed": "0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea" },
     { "id": 5, "category": "Forex", "source": "ChainlinkFeed", "title": "EUR/USD >= 1.15", "feed": "0x1a81afB8146aeFfCFc5E50e8479e826E7D55b910" },
-    { "id": 6, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 3, "title": "UEFA Champions League winner", "sourceRef": "obscura-sports-ucl-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" }
+    { "id": 6, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 3, "title": "UEFA Champions League winner", "sourceRef": "obscura-sports-ucl-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" },
+    { "id": 7, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 4, "title": "F1 World Drivers' Champion 2026", "sourceRef": "f1-wdc-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" },
+    { "id": 8, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 4, "title": "F1 Constructors' Champion 2026", "sourceRef": "f1-wcc-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" },
+    { "id": 9, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 4, "title": "Spanish GP (Madrid) 2026 winner", "sourceRef": "f1-spain-gp-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" },
+    { "id": 10, "category": "Sports", "source": "CreWorkflow", "numOutcomes": 4, "title": "Azerbaijan GP 2026 winner", "sourceRef": "f1-azerbaijan-gp-2026", "resolver": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308" }
   ],
   "seededMarketsNote": "Phase 8.1 (2026-09-12): extended the board to cover every category tab. Crypto (ETH/BTC/LINK) from the first seed; added Gold (commodity) + EUR/USD (forex) via createMarket, and one 3-outcome categorical/sports market (UCL winner) via createMarketWithSource (CreWorkflow, operator stands in for the DON/CRE forwarder). Market #3 is the pre-existing Graph-resolved market.",
   "deployer": "0xf3991DF4dEf9d754709e025E09a3Fda9A98Ee308",
