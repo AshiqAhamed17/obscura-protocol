@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract, useAccount, useChainId } from "wagmi";
+import { useReadContract, useReadContracts, useChainId } from "wagmi";
 import {
   abi,
   contractsFor,
@@ -15,12 +15,13 @@ import {
   type MarketTuple,
 } from "@/lib/contract";
 import { statusLabel, statusClass, outcomeLabel, usd, usdc, usdcCompact, priceUsd } from "@/lib/format";
-import { marketCategory, type MarketCategory } from "@/hooks/useMarkets";
+import { marketCategory, marketTitle, type MarketCategory } from "@/hooks/useMarkets";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
 import { PriceChart } from "./PriceChart";
+import { ChartPanel } from "./ChartPanel";
 import { Countdown } from "./Countdown";
 
-type Row = { id: bigint; m: Market; source: number };
+type Row = { id: bigint; m: Market; source: number; sourceRef: string };
 type Filter = "all" | "open" | "resolved" | "settled";
 type Sort = "soon" | "pool" | "newest";
 
@@ -40,16 +41,6 @@ const CATEGORIES: { key: Cat; label: string }[] = [
   { key: "Forex", label: "Forex" },
   { key: "Sports", label: "Sports" },
 ];
-
-/// Human title for a market: feed-resolved shows the asset + threshold;
-/// Graph/CRE-resolved markets have no on-chain feed, so name them by source.
-function marketTitle(m: Market, source: number): string {
-  if (source === ResolutionSource.ChainlinkFeed) {
-    return `${feedLabel(m.feed).asset} ≥ ${usd(m.threshold)}`;
-  }
-  if (source === ResolutionSource.GraphQuery) return "Graph-resolved market";
-  return "CRE-resolved market";
-}
 
 export function MarketList() {
   const chainId = useChainId();
@@ -91,8 +82,10 @@ export function MarketList() {
     return raw
       .map((r, i) => {
         if (r.status !== "success") return null;
-        const src = sources?.[i]?.status === "success" ? Number((sources[i].result as readonly unknown[])[0]) : 0;
-        return { id: BigInt(i), m: parseMarket(r.result as unknown as MarketTuple), source: src };
+        const cfg = sources?.[i]?.status === "success" ? (sources[i].result as readonly [number, string, string]) : undefined;
+        const src = cfg ? Number(cfg[0]) : 0;
+        const sourceRef = cfg ? String(cfg[2]) : "";
+        return { id: BigInt(i), m: parseMarket(r.result as unknown as MarketTuple), source: src, sourceRef };
       })
       .filter((x): x is Row => x !== null);
   }, [raw, sources]);
@@ -170,7 +163,7 @@ export function MarketList() {
       )}
 
       {featured && (filter === "all" || filter === "open") && (
-        <FeaturedMarket key={featured.id.toString()} id={featured.id} m={featured.m} source={featured.source} />
+        <FeaturedMarket key={featured.id.toString()} id={featured.id} m={featured.m} source={featured.source} sourceRef={featured.sourceRef} />
       )}
 
       <div className="filterbar">
@@ -196,7 +189,7 @@ export function MarketList() {
       ) : (
         <div className="grid">
           {shown.map((r, i) => (
-            <MarketCard key={r.id.toString()} id={r.id} m={r.m} source={r.source} index={i} />
+            <MarketCard key={r.id.toString()} id={r.id} m={r.m} source={r.source} sourceRef={r.sourceRef} index={i} />
           ))}
         </div>
       )}
@@ -258,7 +251,7 @@ function FeaturedMarket({ id, m, source }: Row) {
         </div>
       </div>
 
-      <PriceChart points={points} threshold={target} variant="full" />
+      <ChartPanel feed={m.feed} threshold={target} points={points} />
 
       <div className="featured-foot">
         <div className="featured-metrics">
@@ -290,11 +283,9 @@ function FeaturedMarket({ id, m, source }: Row) {
   );
 }
 
-function MarketCard({ id, m, source, index }: Row & { index: number }) {
-  const { isConnected } = useAccount();
-  const chainId = useChainId();
-  const { predictionMarket, explorer } = contractsFor(chainId);
+function MarketCard({ id, m, source, sourceRef, index }: Row & { index: number }) {
   const isFeed = source === ResolutionSource.ChainlinkFeed;
+  const category = marketCategory(m, source);
 
   const px = useMotionValue(0);
   const py = useMotionValue(0);
@@ -312,18 +303,7 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
 
   const target = Number(m.threshold) / 1e8;
   const { points, current } = usePriceHistory(isFeed ? m.feed : ("0x0000000000000000000000000000000000000000" as `0x${string}`));
-
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-  const { refetch } = useReadContract({ abi, address: predictionMarket, functionName: "markets", args: [id], query: { enabled: false } });
-
-  useEffect(() => {
-    if (isSuccess) refetch();
-  }, [isSuccess, refetch]);
-
-  const now = BigInt(Math.floor(Date.now() / 1000));
   const isOpen = m.status === 0;
-  const resolvable = isOpen && isFeed && now >= m.resolveAfter;
 
   return (
     <motion.article
@@ -338,10 +318,13 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
       style={{ rotateX, rotateY, transformPerspective: 900 }}
     >
       <div className="card-top">
-        <span className={`pill ${statusClass(m.status)}`}>{statusLabel(m.status)}</span>
-        <span className="card-id">#{id.toString()}</span>
+        <span className="card-cat mono">{category}</span>
+        <div className="card-top-right">
+          <span className={`pill ${statusClass(m.status)}`}>{statusLabel(m.status)}</span>
+          <span className="card-id">#{id.toString()}</span>
+        </div>
       </div>
-      <h3>{marketTitle(m, source)}</h3>
+      <h3>{marketTitle(m, source, sourceRef)}</h3>
 
       <div className="card-src"><SourceChip source={source} />{m.numOutcomes > 2 && <span className="src-chip mono">{m.numOutcomes} outcomes</span>}</div>
 
@@ -367,10 +350,15 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
             <b><Countdown resolveAfter={m.resolveAfter} /></b>
           </div>
         )}
-        {isFeed && (
+        {isFeed ? (
           <div className="row">
             <span>Live</span>
             <ThresholdDistance current={current} threshold={target} />
+          </div>
+        ) : (
+          <div className="row">
+            <span>Positions</span>
+            <b>{m.depositCount.toString()}</b>
           </div>
         )}
       </div>
@@ -381,18 +369,8 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
             Take a position
           </Link>
         )}
-        {isOpen && isFeed && (
-          <button
-            className="btn sm"
-            disabled={!isConnected || !resolvable || isPending || confirming}
-            onClick={() => writeContract({ abi, address: predictionMarket, functionName: "resolveMarket", args: [id] })}
-            title={resolvable ? "Read Chainlink and set the outcome" : "Resolves later"}
-          >
-            {isPending ? "Confirm…" : confirming ? "Resolving…" : resolvable ? "Resolve" : "Locked"}
-          </button>
-        )}
         {m.status === 2 && (
-          <Link className="btn sm" href={`/claim?market=${id.toString()}`}>
+          <Link className="btn sm" href={`/portfolio`}>
             Claim
           </Link>
         )}
@@ -400,18 +378,6 @@ function MarketCard({ id, m, source, index }: Row & { index: number }) {
           Solvency
         </Link>
       </div>
-
-      {error && (
-        <p className="card-note tag-no">{(error as { shortMessage?: string }).shortMessage ?? "Transaction failed"}</p>
-      )}
-      {isSuccess && (
-        <p className="card-note tag-yes">
-          Resolved ✓{" "}
-          <a href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
-            view tx ↗
-          </a>
-        </p>
-      )}
     </motion.article>
   );
 }

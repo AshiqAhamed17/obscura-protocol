@@ -2598,6 +2598,61 @@ footer {
   background: rgba(var(--cool), 0.2);
 }
 
+/* --- chart panel (line / candle toggle) --- */
+.chartpanel {
+  position: relative;
+}
+.chart-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+.chart-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.8rem;
+  border: 0;
+  border-radius: calc(var(--r-sm) - 3px);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.chart-toggle button.on {
+  background: rgba(var(--cool), 0.14);
+  color: var(--fg);
+}
+.candle-chart {
+  width: 100%;
+}
+.chart-note {
+  font-size: 0.7rem;
+  color: var(--fg-3);
+  margin-top: 0.5rem;
+}
+
+/* market card category chip + header row */
+.card-top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.card-cat {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+
 /* --- parlays --- */
 .seg {
   display: inline-flex;

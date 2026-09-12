@@ -13,12 +13,37 @@ import {
 } from "@/lib/contract";
 import { usd } from "@/lib/format";
 
+/// Decode an on-chain bytes32 sourceRef into its ASCII handle (nulls trimmed).
+export function decodeSourceRef(ref?: string): string {
+  if (!ref || !ref.startsWith("0x")) return "";
+  let out = "";
+  const hex = ref.slice(2);
+  for (let i = 0; i < hex.length; i += 2) {
+    const code = parseInt(hex.slice(i, i + 2), 16);
+    if (code === 0) break;
+    out += String.fromCharCode(code);
+  }
+  return out;
+}
+
+/// Human titles + outcome labels for known categorical markets, keyed by the
+/// decoded sourceRef (there is no on-chain title field by design).
+export const SOURCE_REF_MARKETS: Record<string, { title: string; outcomes?: string[] }> = {
+  "obscura-sports-ucl-2026": {
+    title: "UEFA Champions League — Winner",
+    outcomes: ["Real Madrid", "Man City", "Field"],
+  },
+};
+
 /// Human title for a market: feed-resolved shows the asset + threshold;
-/// Graph/CRE-resolved markets have no on-chain feed, so name them by source.
-export function marketTitle(m: Market, source: number): string {
+/// categorical markets use their sourceRef mapping; other non-feed markets are
+/// named by source.
+export function marketTitle(m: Market, source: number, sourceRef?: string): string {
   if (source === ResolutionSource.ChainlinkFeed) {
     return `${feedLabel(m.feed).asset} ≥ ${usd(m.threshold)}`;
   }
+  const known = SOURCE_REF_MARKETS[decodeSourceRef(sourceRef)];
+  if (known) return known.title;
   if (source === ResolutionSource.GraphQuery) return "Graph-resolved market";
   return "CRE-resolved market";
 }
@@ -49,6 +74,7 @@ export interface MarketOption {
   source: number;
   title: string;
   category: MarketCategory;
+  sourceRef: string;
 }
 
 /// Loads every market on the connected chain (via multicall) with a ready-made
@@ -91,9 +117,17 @@ export function useMarkets(): { options: MarketOption[]; count: number; isLoadin
       .map((r, i) => {
         if (r.status !== "success" || !r.result) return null;
         const market = parseMarket(r.result as unknown as MarketTuple);
-        const src = sources?.[i]?.result as readonly [number, ...unknown[]] | undefined;
+        const src = sources?.[i]?.result as readonly [number, string, string] | undefined;
         const source = src ? Number(src[0]) : ResolutionSource.ChainlinkFeed;
-        return { id: i, market, source, title: marketTitle(market, source), category: marketCategory(market, source) };
+        const sourceRef = src ? String(src[2]) : "";
+        return {
+          id: i,
+          market,
+          source,
+          sourceRef,
+          title: marketTitle(market, source, sourceRef),
+          category: marketCategory(market, source),
+        };
       })
       .filter((o): o is MarketOption => o !== null);
   }, [raw, sources]);
