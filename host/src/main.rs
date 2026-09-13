@@ -60,6 +60,43 @@ fn stdin_for(batch: &[MarketNotes]) -> SP1Stdin {
     stdin
 }
 
+fn hexs(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// Parse a 0x-prefixed hex string into a big-endian 32-byte field element.
+fn hex32(s: &str) -> [u8; 32] {
+    let s = s.trim().trim_start_matches("0x");
+    let raw: Vec<u8> =
+        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex")).collect();
+    let mut out = [0u8; 32];
+    let start = 32 - raw.len();
+    out[start..].copy_from_slice(&raw);
+    out
+}
+
+/// Build a REAL one-market settlement batch from env vars, so a live on-chain
+/// market can be settled with a genuine proof (secrets stay out of the repo).
+/// Required: OBSCURA_MARKET_ID, OBSCURA_OUTCOME, OBSCURA_AMOUNT, OBSCURA_ESCROW,
+/// OBSCURA_SECRET_HEX, OBSCURA_NS_HEX. Optional: OBSCURA_NUM_OUTCOMES (default 2).
+/// Returns None if the required vars are absent (falls back to the sample batch).
+fn batch_from_env() -> Option<Vec<MarketNotes>> {
+    let market_id: u64 = std::env::var("OBSCURA_MARKET_ID").ok()?.parse().ok()?;
+    let outcome: Outcome = std::env::var("OBSCURA_OUTCOME").ok()?.parse().ok()?;
+    let amount: u64 = std::env::var("OBSCURA_AMOUNT").ok()?.parse().ok()?;
+    let escrow: u64 = std::env::var("OBSCURA_ESCROW").ok()?.parse().ok()?;
+    let secret = std::env::var("OBSCURA_SECRET_HEX").ok()?;
+    let ns = std::env::var("OBSCURA_NS_HEX").ok()?;
+    let num_outcomes: u8 =
+        std::env::var("OBSCURA_NUM_OUTCOMES").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
+    Some(vec![MarketNotes {
+        market_id,
+        num_outcomes,
+        escrowed_collateral: escrow,
+        notes: vec![Note { outcome, amount, secret: hex32(&secret), nullifier_secret: hex32(&ns) }],
+    }])
+}
+
 fn execute_all(client: &impl Prover) {
     for (label, batch) in [("one market", one_market()), ("several markets", several_markets())] {
         println!("executing: {label}");
@@ -125,22 +162,34 @@ fn dump_values() {
 /// Groth16 proving is heavy — run it on the Succinct Prover Network:
 ///   SP1_PROVER=network NETWORK_PRIVATE_KEY=0x... cargo run --release -p host -- --evm
 fn prove_evm(client: &impl Prover) {
-    let batch = one_market();
+    // Prefer a real on-chain market batch from env; fall back to the sample.
+    let (batch, real) = match batch_from_env() {
+        Some(b) => (b, true),
+        None => (one_market(), false),
+    };
+    println!("batch source: {}", if real { "REAL (env)" } else { "sample one_market()" });
+    let expected = settle_batch(&batch).expect("reference settlement failed");
+    println!("expected settlements: {expected:?}");
+
     let pk = client.setup(GUEST_ELF).expect("setup failed");
     println!("programVKey: {}", pk.verifying_key().bytes32());
 
-    println!("generating Groth16 (EVM) proof...");
+    println!("generating Groth16 (EVM) proof... (this is the heavy step)");
     let proof = client.prove(&pk, stdin_for(&batch)).groth16().run().expect("groth16 proving failed");
 
     client.verify(&proof, pk.verifying_key(), None).expect("verification failed");
-    println!("proof verified.");
+    println!("proof verified locally.");
 
     std::fs::create_dir_all("host/proofs").expect("create proofs dir");
     std::fs::write("host/proofs/batch_proof_evm.bin", proof.bytes()).expect("write proof");
     std::fs::write("host/proofs/batch_public_values.bin", proof.public_values.as_slice())
         .expect("write public values");
-    println!("wrote host/proofs/batch_proof_evm.bin + batch_public_values.bin");
-    println!("-> call settleWithProof(publicValues, proofBytes) on-chain with these.");
+
+    // Print both as 0x-hex so they can be fed straight to settleWithProof.
+    println!("\n================ COPY THESE TO settleWithProof ================");
+    println!("PUBLIC_VALUES_HEX=0x{}", hexs(proof.public_values.as_slice()));
+    println!("PROOF_HEX=0x{}", hexs(&proof.bytes()));
+    println!("==============================================================");
 }
 
 /// Prints the batch-settlement program's verifying-key hash (`programVKey`).
