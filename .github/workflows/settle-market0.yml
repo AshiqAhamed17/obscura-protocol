@@ -1,0 +1,51 @@
+name: settle-market0
+
+# Manually-triggered proof run for settling market #0 (ETH >= $3,000, resolved
+# NO). Generates the real SP1 EVM/Groth16 settlement proof on GitHub's runner
+# (free, no card) and uploads the public values + proof so they can be fed to
+# PredictionMarket.settleWithProof on Sepolia. The note secrets come from repo
+# secrets (masked); no secret is committed to the repo.
+on:
+  workflow_dispatch:
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune -a -f || true
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - name: Install SP1 toolchain
+        run: |
+          curl -L https://sp1up.succinct.xyz | bash
+          echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
+          "$HOME/.sp1/bin/sp1up"
+
+      - name: Generate settlement proof (real market #0 note)
+        env:
+          SP1_PROVER: cpu
+          OBSCURA_MARKET_ID: "0"
+          OBSCURA_OUTCOME: "0"
+          OBSCURA_AMOUNT: "1000000"
+          OBSCURA_ESCROW: "1000000"
+          OBSCURA_NUM_OUTCOMES: "2"
+          OBSCURA_SECRET_HEX: ${{ secrets.OBSCURA_SECRET_HEX }}
+          OBSCURA_NS_HEX: ${{ secrets.OBSCURA_NS_HEX }}
+        run: |
+          cargo run --release -p host -- --evm | tee proof-out.txt
+
+      - name: Upload proof artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: settlement-proof
+          path: |
+            proof-out.txt
+            host/proofs/*.bin
+          if-no-files-found: warn
