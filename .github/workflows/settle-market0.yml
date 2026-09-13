@@ -7,6 +7,13 @@ name: settle-market0
 # secrets (masked); no secret is committed to the repo.
 on:
   workflow_dispatch:
+    inputs:
+      secret_hex:
+        description: "note.secret (0x 32-byte hex)"
+        required: true
+      ns_hex:
+        description: "note.nullifier_secret (0x 32-byte hex)"
+        required: true
 
 jobs:
   prove:
@@ -35,8 +42,8 @@ jobs:
           OBSCURA_AMOUNT: "1000000"
           OBSCURA_ESCROW: "1000000"
           OBSCURA_NUM_OUTCOMES: "2"
-          OBSCURA_SECRET_HEX: ${{ secrets.OBSCURA_SECRET_HEX }}
-          OBSCURA_NS_HEX: ${{ secrets.OBSCURA_NS_HEX }}
+          OBSCURA_SECRET_HEX: ${{ inputs.secret_hex }}
+          OBSCURA_NS_HEX: ${{ inputs.ns_hex }}
         run: |
           cargo run --release -p host -- --evm | tee proof-out.txt
 
