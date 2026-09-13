@@ -26,6 +26,16 @@ jobs:
           sudo docker image prune -a -f || true
           df -h
 
+      - name: Add swap (so the Groth16 wrap fits in memory)
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 24G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          sudo sysctl vm.swappiness=100
+          free -h
+
       - uses: actions/checkout@v4
 
       - name: Install build deps (protoc)
