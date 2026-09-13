@@ -93,6 +93,9 @@ export function marketCategory(m: Market, source: number): MarketCategory {
   return "Sports";
 }
 
+/// Markets hidden from the board + dropdowns (generic Graph placeholder).
+export const HIDDEN_MARKETS = new Set<number>([3]);
+
 export interface MarketOption {
   id: number;
   market: Market;
@@ -141,6 +144,7 @@ export function useMarkets(): { options: MarketOption[]; count: number; isLoadin
     return raw
       .map((r, i) => {
         if (r.status !== "success" || !r.result) return null;
+        if (HIDDEN_MARKETS.has(i)) return null; // hidden from board + dropdowns
         const market = parseMarket(r.result as unknown as MarketTuple);
         const src = sources?.[i]?.result as readonly [number, string, string] | undefined;
         const source = src ? Number(src[0]) : ResolutionSource.ChainlinkFeed;

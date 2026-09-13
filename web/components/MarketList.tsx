@@ -15,7 +15,7 @@ import {
   type MarketTuple,
 } from "@/lib/contract";
 import { statusLabel, statusClass, outcomeLabel, usd, usdc, usdcCompact, priceUsd } from "@/lib/format";
-import { marketCategory, marketTitle, type MarketCategory } from "@/hooks/useMarkets";
+import { marketCategory, marketTitle, HIDDEN_MARKETS, type MarketCategory } from "@/hooks/useMarkets";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
 import { PriceChart } from "./PriceChart";
 import { ChartPanel } from "./ChartPanel";
@@ -82,6 +82,7 @@ export function MarketList() {
     return raw
       .map((r, i) => {
         if (r.status !== "success") return null;
+        if (HIDDEN_MARKETS.has(i)) return null; // hidden from the board
         const cfg = sources?.[i]?.status === "success" ? (sources[i].result as readonly [number, string, string]) : undefined;
         const src = cfg ? Number(cfg[0]) : 0;
         const sourceRef = cfg ? String(cfg[2]) : "";

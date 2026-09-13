@@ -2651,6 +2651,24 @@ footer {
   margin-top: 0.5rem;
 }
 
+/* portfolio: remove a stale saved note */
+.pos-remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg-3);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pos-remove:hover {
+  color: var(--no);
+  border-color: color-mix(in srgb, var(--no) 45%, var(--line));
+}
+
 /* how-it-works explainer callout */
 .explainer {
   border: 1px solid var(--line);

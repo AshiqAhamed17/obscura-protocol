@@ -104,6 +104,13 @@ export function importNote(json: string): boolean {
   }
 }
 
+/// Remove a stored position by its commitment (e.g. a stale/junk test note).
+export function deleteNote(commitment: string): void {
+  if (typeof window === "undefined") return;
+  const all = loadNotes().filter((s) => s.commitment.toLowerCase() !== commitment.toLowerCase());
+  localStorage.setItem(KEY, JSON.stringify(all));
+}
+
 export function loadNotes(): StoredNote[] {
   if (typeof window === "undefined") return [];
   try {

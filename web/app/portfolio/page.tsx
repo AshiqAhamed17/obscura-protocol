@@ -6,6 +6,7 @@ import { useAccount, useChainId, useReadContracts, useWaitForTransactionReceipt,
 import { abi, contractsFor, feedLabel, parseMarket, type Market, type MarketTuple } from "@/lib/contract";
 import {
   commitment,
+  deleteNote,
   importNote,
   loadNotes,
   noteToJson,
@@ -282,6 +283,18 @@ function PositionRow({
         {isSuccess && hash && (
           <a className="pos-tx mono tag-yes" href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer">tx ↗</a>
         )}
+        <button
+          className="pos-remove"
+          title="Remove this saved note from this browser"
+          onClick={() => {
+            if (confirm("Remove this saved position from this browser? (You can re-import it from its note JSON.)")) {
+              deleteNote(commitment(note));
+              onClaimed();
+            }
+          }}
+        >
+          ×
+        </button>
       </div>
 
       {(status || error) && (
