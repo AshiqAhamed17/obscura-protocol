@@ -41,6 +41,12 @@
       "address": "0x4C351042FcF905F76BAe0ef83e80de69eF8e378e",
       "explorer": "https://sepolia.etherscan.io/address/0x4C351042FcF905F76BAe0ef83e80de69eF8e378e",
       "note": "Phase 7.4 — dedicated shielded multi-leg pool. Wired to the canonical PredictionMarket + USDC; deployer is the settler (prod: SP1/DON forwarder). Deposits are USDC-escrowed against a Poseidon parlay commitment; a winning ticket claims with a zk proof that every leg backed the resolved outcome."
+    },
+    "AutoResolver": {
+      "address": "0xe8877e58dbeE5A0E2ec2900636F0A87Ab5e732be",
+      "verified": true,
+      "explorer": "https://sepolia.etherscan.io/address/0xe8877e58dbeE5A0E2ec2900636F0A87Ab5e732be",
+      "note": "Phase 8.5 — Chainlink Automation custom-logic keeper (checkUpkeep/performUpkeep). Auto-calls resolveMarket the moment a Chainlink-feed market passes its deadline (mirrors the feed-freshness guard so it never fires a reverting call). Register at automation.chain.link as a custom-logic upkeep and fund with LINK. 8 Foundry tests green."
     }
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",
