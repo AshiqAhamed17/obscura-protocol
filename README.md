@@ -2,54 +2,54 @@
 
 **Privacy-first prediction markets, settled by proof instead of trust.**
 
-*Prove you were right — without revealing your bet.*
+*Prove you were right  without revealing your bet.*
 
 ---
 
 ## The idea
 
 Prediction markets today (Polymarket, Kalshi, Augur) make every position fully
-public — anyone can see what you bet, which side, and how much. That leaks
+public  anyone can see what you bet, which side, and how much. That leaks
 strategy and invites front-running on correlated markets.
 
 Obscura is a prediction market where **your position is shielded end to end**,
-yet the market's payouts are **provably correct and solvent** — no operator is
+yet the market's payouts are **provably correct and solvent**  no operator is
 trusted for the numbers.
 
-- **Shielded positions** — your side and stake are hidden behind a Poseidon
+- **Shielded positions**  your side and stake are hidden behind a Poseidon
   commitment; the chain only ever sees a fingerprint.
-- **Proven, not promised, solvency** — an **SP1 zkVM** proof verifies that each
+- **Proven, not promised, solvency**  an **SP1 zkVM** proof verifies that each
   market's per-outcome totals and commitments root were computed correctly from
   the real deposits, and reconcile with the escrowed USDC, before any payout
   unlocks.
-- **Confidential *and* verifiable settlement** — a **Chainlink CRE** workflow
+- **Confidential *and* verifiable settlement**  a **Chainlink CRE** workflow
   aggregates positions inside a TEE (operators never see plaintext), while the
   SP1 proof keeps the result trustless on-chain. Both properties, kept.
-- **Real oracle resolution** — markets resolve against a live **Chainlink**
-  price feed, a **Graph** metric, or a **CRE** workflow — a resolution-source
+- **Real oracle resolution**  markets resolve against a live **Chainlink**
+  price feed, a **Graph** metric, or a **CRE** workflow  a resolution-source
   agnostic market factory.
-- **Private, unlinkable claims** — winners prove in zero knowledge that they
+- **Private, unlinkable claims**  winners prove in zero knowledge that they
   hold a winning note and withdraw to any address, with no on-chain link back
   to the deposit.
 
 Built on top of shielded positions: **Private Parlays** (stack picks into one
-shielded bet), **Proof of Foresight** ("I called it" — an anonymous, verifiable
+shielded bet), **Proof of Foresight** ("I called it"  an anonymous, verifiable
 track record), and **ZK accuracy reputation**.
 
 ## Why this matters
 
 Most "private" prediction-market attempts stop at hiding individual positions.
 The harder, largely unsolved problem is proving that the *aggregate* settlement
-of a market — or many markets at once — is actually correct and solvent, without
+of a market  or many markets at once  is actually correct and solvent, without
 revealing any individual position. That composition is what Obscura demonstrates.
 
 ## What's live
 
-- **Full Next.js app** — a market board (Crypto · Commodities · Forex · Sports),
+- **Full Next.js app**  a market board (Crypto · Commodities · Forex · Sports),
   shielded deposit, private parlays, portfolio with P&L + one-click claim, an
   in-browser AI risk oracle, a public solvency audit, and Proof-of-Foresight /
   reputation. In-browser Noir proving for claims and foresight.
-- **11 real markets on Sepolia** — ETH/BTC/LINK/Gold/EUR price markets plus
+- **11 real markets on Sepolia**  ETH/BTC/LINK/Gold/EUR price markets plus
   categorical event markets (UEFA Champions League, F1 drivers'/constructors'
   champions, Spanish & Azerbaijan GP winners).
 - **Deployed + verified on Ethereum Sepolia and Circle Arc testnet.**
@@ -72,30 +72,30 @@ Subgraph (Studio v0.0.2): `api.studio.thegraph.com/query/1758912/obscura-protoco
 
 ## How it works (a bet, end to end)
 
-1. **Deposit** — your browser builds a secret note and posts only its Poseidon
+1. **Deposit**  your browser builds a secret note and posts only its Poseidon
    commitment; your USDC is escrowed. Side and stake stay hidden.
-2. **Resolve** — after the deadline, `resolveMarket` reads the Chainlink feed
+2. **Resolve**  after the deadline, `resolveMarket` reads the Chainlink feed
    (or a Graph/CRE resolver reports it) and records the winning outcome.
-3. **Settle** — an SP1 proof establishes the per-outcome totals + commitments
+3. **Settle**  an SP1 proof establishes the per-outcome totals + commitments
    root and proves they reconcile with the escrowed USDC; the market flips to
    *Settled*. (Confidentially aggregated in a Chainlink CRE TEE; verifiably
    correct via SP1.)
-4. **Claim** — you generate a Noir proof in-browser that you hold an unspent,
+4. **Claim**  you generate a Noir proof in-browser that you hold an unspent,
    winning note, burn a one-time nullifier, and the pari-mutuel payout is sent
-   to a recipient bound into the proof — unlinkable to your deposit.
+   to a recipient bound into the proof  unlinkable to your deposit.
 
 Payouts are pari-mutuel: `payout = your stake × pool ÷ winning-side total`.
 
-## Architecture — three sponsor integrations
+## Architecture  three sponsor integrations
 
-### Chainlink CRE — confidential + verifiable settlement
+### Chainlink CRE  confidential + verifiable settlement
 
 Node operators sum private positions **inside a TEE** and return only
 aggregates, while an **SP1 proof** makes the settlement trustlessly correct
-on-chain. Confidentiality *and* verifiability — both kept. Markets resolve
+on-chain. Confidentiality *and* verifiability  both kept. Markets resolve
 against live Chainlink price feeds, and a **CRE cron workflow** resolves them
 hands-free the moment they pass their deadline via the on-chain `AutoResolver`
-keeper (`resolveDue()`) — the successor to classic Chainlink Automation, which
+keeper (`resolveDue()`)  the successor to classic Chainlink Automation, which
 sunset in 2026.
 
 ![Chainlink confidential + verifiable settlement](docs/diagrams/chainlink.svg)
@@ -105,7 +105,7 @@ sunset in 2026.
 > `contracts/src/PredictionMarket.sol` `settleWithProof` · `guest/` + `host/` (SP1) ·
 > `cre-settlement/automation/` (CRE cron auto-resolve) + `contracts/src/AutoResolver.sol` (on-chain keeper).
 
-### The Graph — subgraph + AI solvency/risk oracle
+### The Graph  subgraph + AI solvency/risk oracle
 
 A subgraph indexes only public/aggregate data (never plaintext positions); an
 AI risk oracle reasons over it with a **pinned deployment id + freshness gate**,
@@ -118,7 +118,7 @@ the browser.
 > **Where:** `subgraph/` (schema + mappings, Studio v0.0.2) ·
 > `agent/src/` (`obscura-risk-oracle` MCP server) · `web/lib/risk.ts` (in-browser port).
 
-### Circle / Arc — USDC-native escrow + CCTP cross-chain entry
+### Circle / Arc  USDC-native escrow + CCTP cross-chain entry
 
 The escrow is USDC-denominated (ERC-20 + EIP-2612 permit); on Arc, USDC is the
 native gas token. Users can bridge USDC **Base → Arc via CCTP** and open a
@@ -133,7 +133,7 @@ shielded position in one journey.
 | Layer | Tech |
 |---|---|
 | Settlement / escrow | Solidity, Foundry (USDC-denominated) |
-| Privacy layer | Noir zk circuits — shielded deposits, claims, foresight, parlays, reputation |
+| Privacy layer | Noir zk circuits  shielded deposits, claims, foresight, parlays, reputation |
 | Solvency proof | SP1 zkVM |
 | Confidential settlement | Chainlink CRE (TEE) |
 | Indexing / risk agent | The Graph subgraph + MCP AI oracle |
@@ -143,7 +143,7 @@ shielded position in one journey.
 ## Run it locally
 
 ```bash
-# Frontend (Sepolia) — needs a browser wallet
+# Frontend (Sepolia)  needs a browser wallet
 cd web && npm install && npm run dev        # localhost:3000
 
 # Contracts + circuits + proofs
@@ -157,7 +157,7 @@ cd circuits && nargo test                     # Noir circuit tests
 `docs/trust-model.md` details what each proof guarantees. The SP1 settlement
 proof (EVM/Groth16) is memory-heavy, so it is generated on prover infrastructure
 (the Succinct Prover Network or a ≥32 GB machine) and verified on-chain by the
-SP1 gateway — the standard production path. See `host/PROVE_ON_VM.md` for a
+SP1 gateway  the standard production path. See `host/PROVE_ON_VM.md` for a
 reproducible run. The claim + foresight proofs run in the browser (Noir) against
 the deployed on-chain verifiers.
 
