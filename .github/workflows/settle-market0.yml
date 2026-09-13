@@ -28,6 +28,12 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: Install build deps (protoc)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
+
       - name: Install SP1 toolchain
         run: |
           curl -L https://sp1up.succinct.xyz | bash
@@ -45,7 +51,8 @@ jobs:
           OBSCURA_SECRET_HEX: ${{ inputs.secret_hex }}
           OBSCURA_NS_HEX: ${{ inputs.ns_hex }}
         run: |
-          cargo run --release -p host -- --evm | tee proof-out.txt
+          set -eo pipefail
+          cargo run --release -p host -- --evm 2>&1 | tee proof-out.txt
 
       - name: Upload proof artifacts
         if: always()
