@@ -64,7 +64,7 @@ revealing any individual position. That composition is what Obscura demonstrates
 | ParlayPool | `0x4C351042FcF905F76BAe0ef83e80de69eF8e378e` |
 | ConfidentialSettlementConsumer (CRE) | `0x1E9E464F107246f21f32330311b061A8e340d1b4` |
 | CreResolutionConsumer | `0x4ae8FF6f6D1957fCb72cb2002223c04Fd64235F3` |
-| AutoResolver (Chainlink Automation) | `0xe8877e58dbeE5A0E2ec2900636F0A87Ab5e732be` |
+| AutoResolver (CRE cron keeper) | `0x90095B45E10f650d2b766a86E600d3D672a22606` |
 | USDC (Circle, Sepolia) | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
 
 Subgraph (Studio v0.0.2): `api.studio.thegraph.com/query/1758912/obscura-protocol/v0.0.2`
@@ -93,15 +93,17 @@ Payouts are pari-mutuel: `payout = your stake × pool ÷ winning-side total`.
 Node operators sum private positions **inside a TEE** and return only
 aggregates, while an **SP1 proof** makes the settlement trustlessly correct
 on-chain. Confidentiality *and* verifiability — both kept. Markets resolve
-against live Chainlink price feeds, and a **Chainlink Automation** upkeep
-(`AutoResolver`) resolves them hands-free the moment they pass their deadline.
+against live Chainlink price feeds, and a **CRE cron workflow** resolves them
+hands-free the moment they pass their deadline via the on-chain `AutoResolver`
+keeper (`resolveDue()`) — the successor to classic Chainlink Automation, which
+sunset in 2026.
 
 ![Chainlink confidential + verifiable settlement](docs/diagrams/chainlink.svg)
 
 > **Where:** `cre-settlement/settlement/workflow.ts` (TEE handler) ·
 > `contracts/src/ConfidentialSettlementConsumer.sol` (reconciles vs SP1 totals) ·
 > `contracts/src/PredictionMarket.sol` `settleWithProof` · `guest/` + `host/` (SP1) ·
-> `contracts/src/AutoResolver.sol` (Automation `checkUpkeep`/`performUpkeep`).
+> `cre-settlement/automation/` (CRE cron auto-resolve) + `contracts/src/AutoResolver.sol` (on-chain keeper).
 
 ### The Graph — subgraph + AI solvency/risk oracle
 

@@ -1,0 +1,5 @@
+{
+  "schedule": "0 */5 * * * *",
+  "autoResolver": "0x90095B45E10f650d2b766a86E600d3D672a22606",
+  "chainSelectorName": "ethereum-testnet-sepolia"
+}

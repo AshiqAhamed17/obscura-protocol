@@ -1,0 +1,20 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE — automation (auto-resolve due markets)
+# The successor to classic Chainlink Automation (sunset 2026). A cron trigger
+# drives AutoResolver.resolveDue() on-chain via a DON-signed report.
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "obscura-automation-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "obscura-automation-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: "../secrets.yaml"

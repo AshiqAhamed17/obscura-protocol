@@ -43,10 +43,11 @@
       "note": "Phase 7.4 — dedicated shielded multi-leg pool. Wired to the canonical PredictionMarket + USDC; deployer is the settler (prod: SP1/DON forwarder). Deposits are USDC-escrowed against a Poseidon parlay commitment; a winning ticket claims with a zk proof that every leg backed the resolved outcome."
     },
     "AutoResolver": {
-      "address": "0xe8877e58dbeE5A0E2ec2900636F0A87Ab5e732be",
+      "address": "0x90095B45E10f650d2b766a86E600d3D672a22606",
       "verified": true,
-      "explorer": "https://sepolia.etherscan.io/address/0xe8877e58dbeE5A0E2ec2900636F0A87Ab5e732be",
-      "note": "Phase 8.5 — Chainlink Automation custom-logic keeper (checkUpkeep/performUpkeep). Auto-calls resolveMarket the moment a Chainlink-feed market passes its deadline (mirrors the feed-freshness guard so it never fires a reverting call). Register at automation.chain.link as a custom-logic upkeep and fund with LINK. 8 Foundry tests green."
+      "explorer": "https://sepolia.etherscan.io/address/0x90095B45E10f650d2b766a86E600d3D672a22606",
+      "note": "Phase 8.5 — on-chain resolution keeper driven by a CRE cron workflow (cre-settlement/automation), the official successor to classic Chainlink Automation (sunset 2026: v1 Jun 30, v2.1 Jul 31). onReport(bytes,bytes) is the CRE/KeystoneForwarder entry point; resolveDue() resolves every due Chainlink-feed market in one permissionless call, mirroring resolveMarket's feed-freshness guard; checkUpkeep/performUpkeep kept for Automation-interface compatibility. Proven live: resolved market #2 on Sepolia. 11 Foundry tests green.",
+      "previousAddresses": ["0xe8877e58dbeE5A0E2ec2900636F0A87Ab5e732be", "0x204344a521dFebf9528b02bCa10C70Eb84f29b76"]
     }
   },
   "sp1VerifierGateway": "0x397A5f7f3dBd538f23DE225B51f532c34448dA9B",

@@ -102,6 +102,36 @@ contract AutoResolverTest is Test {
         resolver.performUpkeep(abi.encode(id));
     }
 
+    // --- resolveDue (CRE cron entry point) ---
+
+    function test_resolveDue_resolvesAllDueMarkets() public {
+        uint256 a = _feedMarket(block.timestamp + 1 hours);
+        uint256 b = _feedMarket(block.timestamp + 1 hours);
+        _feedMarket(block.timestamp + 10 days); // not due yet
+        vm.warp(block.timestamp + 2 hours);
+        feed.updateAnswer(INITIAL_PRICE);
+
+        uint256 resolved = resolver.resolveDue();
+        assertEq(resolved, 2);
+        assertEq(uint256(_status(a)), uint256(PredictionMarket.Status.Resolved));
+        assertEq(uint256(_status(b)), uint256(PredictionMarket.Status.Resolved));
+        assertEq(uint256(_status(2)), uint256(PredictionMarket.Status.Open)); // far-future market untouched
+    }
+
+    function test_resolveDue_noopWhenNothingDue() public {
+        _feedMarket(block.timestamp + 1 days);
+        assertEq(resolver.resolveDue(), 0);
+    }
+
+    function test_onReport_resolvesDue() public {
+        uint256 id = _feedMarket(block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 2 hours);
+        feed.updateAnswer(INITIAL_PRICE);
+        // A CRE cron workflow delivers a report; content is irrelevant.
+        resolver.onReport(hex"", hex"");
+        assertEq(uint256(_status(id)), uint256(PredictionMarket.Status.Resolved));
+    }
+
     function test_performUpkeep_revertsIfAlreadyResolved() public {
         uint256 id = _feedMarket(block.timestamp + 1 hours);
         vm.warp(block.timestamp + 2 hours);

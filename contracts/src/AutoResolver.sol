@@ -51,6 +51,36 @@ contract AutoResolver {
         market.resolveMarket(marketId);
     }
 
+    /// @notice Scheduler-agnostic entry point: resolves every currently-due
+    ///         feed market in one permissionless call. This is what a CRE cron
+    ///         workflow (the successor to classic Automation, sunset in 2026)
+    ///         invokes on a schedule — no performData, no off-chain checkData.
+    /// @return resolved The number of markets resolved this call.
+    function resolveDue() external returns (uint256 resolved) {
+        return _resolveDue();
+    }
+
+    /// @notice CRE / Chainlink KeystoneForwarder entry point (IReceiver shape).
+    ///         A CRE cron workflow delivers a signed report here on its schedule;
+    ///         the report content is irrelevant because the action it triggers
+    ///         (`_resolveDue`) is permissionless and self-validating, so no
+    ///         forwarder access-control is needed for correctness.
+    function onReport(bytes calldata, bytes calldata) external {
+        _resolveDue();
+    }
+
+    function _resolveDue() internal returns (uint256 resolved) {
+        uint256 count = market.marketCount();
+        for (uint256 i = 0; i < count; i++) {
+            if (_isResolvable(i)) {
+                market.resolveMarket(i);
+                unchecked {
+                    resolved++;
+                }
+            }
+        }
+    }
+
     /// A market is auto-resolvable iff it is Open, past its deadline, and
     /// Chainlink-feed resolved — and the feed itself is live and non-stale, so
     /// this mirrors `resolveMarket`'s own guards and the DON never fires a call
