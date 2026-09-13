@@ -30,6 +30,7 @@ import {
   type ParlayNote,
 } from "@/lib/parlay";
 import { AmbientField } from "@/components/AmbientField";
+import { Explainer } from "@/components/Explainer";
 import { useMarkets, type MarketOption } from "@/hooks/useMarkets";
 import { statusLabel } from "@/lib/format";
 
@@ -47,6 +48,18 @@ export default function ParlaysPage() {
           legs lands on-chain — the book never learns which markets you tied together. Win all three
           and claim with one zero-knowledge proof; miss one and the whole ticket is dead.
         </p>
+        <Explainer
+          title="How private parlays work"
+          steps={[
+            <><b>Pick 3 legs</b> — a market + side for each; they hash together into one Poseidon commitment.</>,
+            <><b>One stake, sealed</b> — your USDC is escrowed in a dedicated ParlayPool; the book never learns which markets you correlated.</>,
+            <><b>All-or-nothing</b> — the parlay pays only if every leg resolves to your pick, claimed with a single zk proof.</>,
+          ]}
+          links={[
+            { label: "ParlayPool", href: "https://sepolia.etherscan.io/address/0x4C351042FcF905F76BAe0ef83e80de69eF8e378e" },
+            { label: "Source", href: "https://github.com/AshiqAhamed17/obscura-protocol" },
+          ]}
+        />
         <Inner />
       </main>
     </>

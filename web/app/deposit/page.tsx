@@ -231,6 +231,11 @@ function DepositForm() {
                 </span>
               )}
             </div>
+            <div className="faucet-help">
+              <span>Need test USDC?</span>
+              <a href="https://faucet.circle.com" target="_blank" rel="noreferrer">Get it from faucet.circle.com</a>
+              <span>(pick Ethereum Sepolia), then import token <code>{usdcAddr.slice(0, 10)}…{usdcAddr.slice(-6)}</code> in your wallet.</span>
+            </div>
           </div>
 
           {!isConnected && <div className="note">Connect your wallet to deposit.</div>}

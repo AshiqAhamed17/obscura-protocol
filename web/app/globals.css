@@ -2651,6 +2651,108 @@ footer {
   margin-top: 0.5rem;
 }
 
+/* how-it-works explainer callout */
+.explainer {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  margin: 0 0 1.6rem;
+  overflow: hidden;
+}
+.explainer > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9rem;
+  color: var(--fg);
+  user-select: none;
+}
+.explainer > summary::-webkit-details-marker {
+  display: none;
+}
+.explainer-q {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, rgb(var(--cool)) 40%, var(--line));
+  color: rgb(var(--cool));
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+.explainer-chev {
+  margin-left: auto;
+  color: var(--fg-3);
+  transition: transform 0.2s ease;
+  font-size: 1.1rem;
+}
+.explainer[open] .explainer-chev {
+  transform: rotate(90deg);
+}
+.explainer-body {
+  padding: 0 1.1rem 1.1rem;
+}
+.explainer-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: var(--fg-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+.explainer-steps b {
+  color: var(--fg);
+}
+.explainer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+}
+.explainer-links-k {
+  color: var(--fg-3);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.explainer-links a {
+  color: rgb(var(--cool));
+}
+
+/* get-test-USDC faucet helper */
+.faucet-help {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-sm);
+  font-size: 0.8rem;
+  color: var(--fg-2);
+  margin-top: 0.6rem;
+}
+.faucet-help a {
+  color: rgb(var(--cool));
+  text-decoration: underline;
+}
+.faucet-help code {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--fg-3);
+}
+
 /* categorical outcome picker (deposit) */
 .outcome-pick {
   display: grid;

@@ -21,6 +21,7 @@ import { commitment, foresightNullifier, loadNotes, storedToNote, type Note } fr
 import { generateForesightProof } from "@/lib/prove";
 import { outcomeLabel, usd } from "@/lib/format";
 import { AmbientField } from "@/components/AmbientField";
+import { Explainer } from "@/components/Explainer";
 
 export default function ReputationPage() {
   return (
@@ -35,6 +36,18 @@ export default function ReputationPage() {
           domain-separated credential, building a verifiable forecasting track record that&apos;s
           unlinkable to your payout.
         </p>
+        <Explainer
+          title="How Proof of Foresight works"
+          steps={[
+            <><b>Wait for settlement</b> — once a market you bet on is settled, your winning note becomes provable.</>,
+            <><b>Prove "I called it"</b> — an in-browser zk proof shows your note backed the winning outcome, revealing only a domain-separated foresight nullifier (never your stake or which deposit).</>,
+            <><b>Build a track record</b> — each credential is registered once on-chain; your reputation badge (≥N correct, ≥X% accuracy) is a verified lower bound, unlinkable to any payout.</>,
+          ]}
+          links={[
+            { label: "ForesightRegistry", href: "https://sepolia.etherscan.io/address/0x6d6B0dD2f40BCA7658237dD0F0c9527a068DaF97" },
+            { label: "Source", href: "https://github.com/AshiqAhamed17/obscura-protocol" },
+          ]}
+        />
         <Inner />
       </main>
     </>
